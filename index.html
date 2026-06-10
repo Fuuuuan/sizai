@@ -509,7 +509,7 @@
     .constellation-container { min-height: 380px; }
   }
 </style>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a0a0f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1880,7 +1880,7 @@ console.log('%c你的每一段文字，都会变成一颗星。',
 
 // Register Service Worker (PWA)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js', { scope: '/sizai/' }).catch(() => {});
 }
 </script>
 </body>

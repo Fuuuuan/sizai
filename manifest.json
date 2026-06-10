@@ -2,7 +2,7 @@
   "name": "思在 — 哲学思辨花园",
   "short_name": "思在",
   "description": "每日一问，书写思辨。你的每一段文字，都会变成一颗星。",
-  "start_url": "/",
+  "start_url": "/sizai/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0f",
