@@ -217,6 +217,28 @@
   .write-area::placeholder {
     color: rgba(200,200,220,0.2);
   }
+  .thread-preview {
+    max-height: 220px; overflow-y: auto;
+    margin-bottom: 14px;
+    padding: 14px 16px;
+    background: rgba(10,10,20,0.4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.82rem; line-height: 1.7;
+  }
+  .thread-preview .tp-msg {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .thread-preview .tp-msg:last-child {
+    margin-bottom: 0; padding-bottom: 0; border-bottom: none;
+  }
+  .thread-preview .tp-role {
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
   .write-meta {
     display: flex; gap: 12px; align-items: center;
     margin-top: 12px; flex-wrap: wrap;
@@ -498,6 +520,7 @@
   <section class="panel" id="panel-write">
     <div class="card">
       <div class="write-meta" id="writeMeta" style="margin-top:0; margin-bottom:12px;"></div>
+      <div class="thread-preview" id="threadPreview" style="display:none;"></div>
       <textarea class="write-area" id="writeArea"
         placeholder="此刻，你在想什么？…"
       ></textarea>
@@ -1059,10 +1082,12 @@ function switchPanel(name) {
 
 function clearWrite() {
   document.getElementById('writeArea').value = '';
+  document.getElementById('writeArea').placeholder = '此刻，你在想什么？…';
   currentPrompt = '';
   editingId = null;
   document.getElementById('promptRef').textContent = '';
   document.getElementById('writeMeta').innerHTML = '';
+  document.getElementById('threadPreview').style.display = 'none';
   document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存为星辰';
   updateCharCount();
 }
@@ -1340,32 +1365,42 @@ function openStarInWriter(id) {
   const entries = getEntries();
   const e = entries.find(en => en.id === id);
   if (!e) return;
-  // 把星辰的文字和 prompt 载入书写面板
-  document.getElementById('writeArea').value = e.text;
-  currentPrompt = e.prompt || '';
   editingId = id;
+  currentPrompt = e.prompt || '';
   if (currentPrompt) {
     document.getElementById('promptRef').textContent = '「' + currentPrompt.slice(0, 50) + '…」';
   } else {
     document.getElementById('promptRef').textContent = '';
   }
-  // 显示线程状态
+  const tp = document.getElementById('threadPreview');
   if (e.thread && e.thread.length > 0) {
-    const rounds = Math.floor(e.thread.length / 2);
+    // ── 有对话线程：显示历史，清空输入区 ──
+    tp.style.display = 'block';
+    tp.innerHTML = e.thread.map(msg => {
+      const isUser = msg.role === 'user';
+      const roleColor = isUser ? 'var(--accent)' : 'rgba(140,200,160,0.7)';
+      const label = isUser ? '💭 你' : '🌿 Claude';
+      const preview = msg.text.length > 150 ? msg.text.slice(0, 150) + '…' : msg.text;
+      return '<div class="tp-msg"><div class="tp-role" style="color:' + roleColor + '">' + label + '</div>' + escapeHtml(preview) + '</div>';
+    }).join('');
+    document.getElementById('writeArea').value = '';
+    document.getElementById('writeArea').placeholder = '继续这段对话…';
     document.getElementById('writeMeta').innerHTML =
-      '<span style="color:var(--accent);">✦ 对话中</span>'
-      + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">' + rounds + ' 轮对话 · 发送新消息会追加到这颗星</span>';
+      '<span style="color:var(--accent);">✦ 对话中 · ' + Math.floor(e.thread.length / 2) + ' 轮</span>'
+      + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">输入新内容后发送，会追加到这颗星辰</span>';
   } else {
+    // ── 无线程：普通编辑模式 ──
+    tp.style.display = 'none';
+    document.getElementById('writeArea').value = e.text;
+    document.getElementById('writeArea').placeholder = '此刻，你在想什么？…';
     document.getElementById('writeMeta').innerHTML =
       '<span style="color:var(--accent);">✦ 编辑</span>'
-      + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">发送给 Claude 后将保存为线程</span>';
+      + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">修改后保存，或发送给 Claude 开始对话</span>';
   }
   document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存';
   switchPanel('write');
   updateCharCount();
   document.getElementById('writeArea').focus();
-  // 光标移到末尾
-  document.getElementById('writeArea').setSelectionRange(e.text.length, e.text.length);
 }
 
 function editEntry(id) {
@@ -1419,6 +1454,19 @@ async function sendToClaude() {
   btn.innerHTML = '<span class="spinner"></span> 思考中…';
   btn.disabled = true;
 
+  // ── 如果是继续已有线程，带上下文一起发送 ──
+  let apiText = text;
+  if (editingId) {
+    const entries = getEntries();
+    const entry = entries.find(e => e.id === editingId);
+    if (entry && entry.thread && entry.thread.length > 0) {
+      const context = entry.thread.map(m =>
+        (m.role === 'user' ? '我：' : 'Claude：') + m.text
+      ).join('\n\n');
+      apiText = '以下是我们的对话历史：\n\n' + context + '\n\n我（继续）：' + text;
+    }
+  }
+
   let reply = null;
   let sent = false;
 
@@ -1429,7 +1477,7 @@ async function sendToClaude() {
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, prompt }),
+        body: JSON.stringify({ text: apiText, prompt }),
         signal: AbortSignal.timeout(65000),
       });
       const data = await resp.json();
@@ -1443,44 +1491,40 @@ async function sendToClaude() {
   }
 
   if (!sent) {
-    copyToClipboard(text, prompt);
+    copyToClipboard(apiText, prompt);
   }
 
-  // ── 自动保存为星辰（带对话线程）──
+  // ── 只把「新消息」加入线程，不重复旧内容 ──
   const now = new Date().toISOString();
-  const threadMsg = [{ role: 'user', text, date: now }];
+  const newMsgs = [{ role: 'user', text, date: now }];
   if (reply) {
-    threadMsg.push({ role: 'claude', text: reply, date: now });
+    newMsgs.push({ role: 'claude', text: reply, date: now });
   }
 
   const entries = getEntries();
   if (editingId) {
-    // 追加到已有星辰的线程
     const idx = entries.findIndex(e => e.id === editingId);
     if (idx >= 0) {
       if (!entries[idx].thread) {
-        // 旧条目转线程格式
         entries[idx].thread = [
           { role: 'user', text: entries[idx].text, date: entries[idx].date }
         ];
       }
-      entries[idx].thread.push(...threadMsg);
+      entries[idx].thread.push(...newMsgs);
       entries[idx].text = text;
       entries[idx].editedAt = now;
     }
   } else {
-    // 新建星辰
     entries.unshift({
       id: Date.now(),
       text,
       prompt: prompt || null,
       date: now,
-      thread: threadMsg,
+      thread: newMsgs,
     });
   }
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
 
-  // 同步到对话面板队列
   const entryId = addToSentQueue(text, prompt);
   if (reply) markReplied(entryId, reply);
 
@@ -1489,11 +1533,11 @@ async function sendToClaude() {
   renderDialogue();
 
   if (reply) {
-    toast('已存为星辰 ✦ Claude 已回复');
+    toast('已追加到星辰 ✦ Claude 已回复');
   } else if (sent) {
-    toast('已存为星辰 · 等待 Claude 回复');
+    toast('已追加到星辰 · 等待 Claude 回复');
   } else {
-    toast('已存为星辰 · 在电脑上继续对话');
+    toast('已存入星辰 · 在电脑上继续对话');
   }
 
   btn.innerHTML = origHTML;
