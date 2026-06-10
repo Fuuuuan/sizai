@@ -101,6 +101,19 @@
     border-color: rgba(212,168,84,0.3);
     color: var(--accent);
   }
+  .sync-btn {
+    position: absolute; top: 16px; left: 20px;
+    z-index: 10;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(200,200,220,0.4);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sync-btn.synced { color: rgba(140,200,160,0.6); border-color: rgba(140,200,160,0.2); }
 
   nav {
     display: flex; justify-content: center; gap: 4px;
@@ -419,6 +432,7 @@
 
 <div id="app">
   <header>
+    <button class="sync-btn" id="syncBtn" onclick="openSettings()" title="Sync settings">☁</button>
     <div class="lang-toggle" id="langToggle">
       <button onclick="switchLang('zh')" id="btnZh">中</button>
       <button onclick="switchLang('en')" id="btnEn">EN</button>
@@ -477,6 +491,11 @@
       还没有文字。<br>去「书写」那里留下你的第一个想法吧。
     </div>
   </section>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="settingsOverlay" style="display:none;" onclick="closeSettings(event)">
+    <div class="modal" id="settingsContent"></div>
+  </div>
 
   <!-- MODAL -->
   <div class="modal-overlay" id="modalOverlay" style="display:none;" onclick="closeModal(event)">
@@ -1173,6 +1192,7 @@ function saveEntry() {
   }
 
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  syncAutoSave();
   clearWrite();
   initStars();
 }
@@ -1189,6 +1209,7 @@ function deleteEntry(id) {
   let entries = getEntries();
   entries = entries.filter(e => e.id !== id);
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  syncAutoSave();
   renderGarden();
   initStars();
   toast('已删除');
@@ -1472,6 +1493,7 @@ async function sendToClaude() {
     });
   }
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  syncAutoSave();
 
   clearWrite();
   initStars();
@@ -1534,6 +1556,7 @@ async function sendThreadMessage(id) {
   }
 
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  syncAutoSave();
   openEntry(id);  // 刷新弹窗
 
   if (reply) {
@@ -1601,6 +1624,146 @@ function toast(msg) {
 }
 
 // ═══════════════════════════════════════
+//  SYNC — GitHub Gist 云同步
+// ═══════════════════════════════════════
+let syncGistId = localStorage.getItem('sizai_gist_id') || null;
+let syncToken = localStorage.getItem('sizai_gh_token') || '';
+let syncInProgress = false;
+
+function ghHeaders() {
+  return syncToken ? { 'Authorization': 'Bearer ' + syncToken, 'Accept': 'application/vnd.github.v3+json' } : {};
+}
+
+async function syncFindOrCreateGist() {
+  if (!syncToken) return null;
+  if (syncGistId) {
+    try {
+      const r = await fetch('https://api.github.com/gists/' + syncGistId, { headers: ghHeaders() });
+      if (r.ok) return syncGistId;
+    } catch(e) {}
+  }
+  try {
+    const r = await fetch('https://api.github.com/gists?per_page=100', { headers: ghHeaders() });
+    const gists = await r.json();
+    if (Array.isArray(gists)) {
+      const found = gists.find(g => g.description && g.description.includes('sizai-data'));
+      if (found) { syncGistId = found.id; localStorage.setItem('sizai_gist_id', syncGistId); return syncGistId; }
+    }
+  } catch(e) {}
+  try {
+    const r = await fetch('https://api.github.com/gists', {
+      method: 'POST', headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: 'sizai-data', public: false, files: { 'sizai-entries.json': { content: '[]' } } })
+    });
+    const data = await r.json();
+    if (data.id) { syncGistId = data.id; localStorage.setItem('sizai_gist_id', syncGistId); return syncGistId; }
+  } catch(e) {}
+  return null;
+}
+
+async function syncUpload() {
+  if (!syncToken || syncInProgress) return;
+  const gistId = await syncFindOrCreateGist();
+  if (!gistId) return;
+  syncInProgress = true;
+  try {
+    const entries = getEntries();
+    await fetch('https://api.github.com/gists/' + gistId, {
+      method: 'PATCH', headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'sizai-entries.json': { content: JSON.stringify(entries, null, 2) } } })
+    });
+    document.getElementById('syncBtn').className = 'sync-btn synced';
+  } catch(e) {
+    document.getElementById('syncBtn').className = 'sync-btn';
+  }
+  syncInProgress = false;
+}
+
+async function syncDownload() {
+  if (!syncToken) return false;
+  const gistId = await syncFindOrCreateGist();
+  if (!gistId) return false;
+  try {
+    const r = await fetch('https://api.github.com/gists/' + gistId, { headers: ghHeaders() });
+    const gist = await r.json();
+    const file = gist.files && gist.files['sizai-entries.json'];
+    if (file && file.content) {
+      const remote = JSON.parse(file.content);
+      if (!Array.isArray(remote)) return false;
+      const merged = syncMerge(getEntries(), remote);
+      localStorage.setItem('sizai_entries', JSON.stringify(merged));
+      document.getElementById('syncBtn').className = 'sync-btn synced';
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function syncMerge(local, remote) {
+  const map = new Map();
+  remote.forEach(e => map.set(e.id, e));
+  local.forEach(e => {
+    const existing = map.get(e.id);
+    if (!existing || (e.editedAt || e.date) >= (existing.editedAt || existing.date)) {
+      map.set(e.id, e);
+    }
+  });
+  return Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+let syncTimer = null;
+function syncAutoSave() {
+  if (!syncToken) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncUpload(), 2000);
+}
+
+async function syncNow() {
+  if (!syncToken) { openSettings(); return; }
+  toast(L==='zh'?'同步中…':'Syncing…');
+  const changed = await syncDownload();
+  renderGarden();
+  initStars();
+  refreshUI();
+  await syncUpload();
+  toast(changed ? (L==='zh'?'同步完成 ✓':'Synced ✓') : (L==='zh'?'已是最新':'Already up to date'));
+}
+
+function openSettings() {
+  const isZh = L === 'zh';
+  document.getElementById('settingsContent').innerHTML =
+    '<div style="font-size:1rem; color:var(--text-bright); margin-bottom:12px;">' + (isZh?'同步设置':'Sync Settings') + '</div>'
+    + '<p style="font-size:0.8rem; color:rgba(200,200,220,0.5); margin-bottom:12px; line-height:1.6;">'
+    + (isZh?'需要一个 GitHub Personal Access Token（<b>gist</b> 权限）。Token 只保存在你的浏览器中。<br><br>创建：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → 只勾选 gist 权限。':'A GitHub Personal Access Token with <b>gist</b> scope is needed. It stays in your browser only.<br><br>Create one: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → select gist scope only.')
+    + '</p>'
+    + '<input id="tokenInput" type="password" style="width:100%; background:rgba(10,10,20,0.5); border:1px solid var(--border); border-radius:8px; padding:10px; color:var(--text); font-size:0.8rem; outline:none;" placeholder="ghp_..." value="' + (syncToken ? syncToken.slice(0, 8) + '…' : '') + '">'
+    + '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'
+    + '<button class="btn primary" onclick="saveToken()">' + (isZh?'保存':'Save') + '</button>'
+    + '<button class="btn" onclick="syncNow()">' + (isZh?'立即同步':'Sync Now') + '</button>'
+    + '<button class="close-btn" onclick="closeSettings()" style="margin-left:auto;">' + (isZh?'关闭':'Close') + '</button>'
+    + '</div>';
+  document.getElementById('settingsOverlay').style.display = 'flex';
+}
+
+function saveToken() {
+  const input = document.getElementById('tokenInput');
+  const val = input.value.trim();
+  if (val && !val.startsWith('…')) {
+    syncToken = val;
+    localStorage.setItem('sizai_gh_token', syncToken);
+    syncGistId = null;
+    localStorage.removeItem('sizai_gist_id');
+    toast(L==='zh'?'Token 已保存':'Token saved');
+  }
+  closeSettings();
+}
+
+function closeSettings(e) {
+  if (e && e.target !== document.getElementById('settingsOverlay')) return;
+  document.getElementById('settingsOverlay').style.display = 'none';
+}
+
+// ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
 displayQuestion();
@@ -1632,6 +1795,13 @@ console.log('%c你的每一段文字，都会变成一颗星。',
 // Register Service Worker (PWA)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js', { scope: '/sizai/' }).catch(() => {});
+}
+
+// ── 启动时同步 ──
+if (syncToken) {
+  syncDownload().then(changed => {
+    if (changed) { renderGarden(); initStars(); refreshUI(); }
+  });
 }
 </script>
 </body>
