@@ -480,7 +480,7 @@
       <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
         <button class="btn primary" onclick="saveEntry()">✦ 保存为星辰</button>
         <button class="btn" onclick="sendToClaude()" id="btnSend" style="border-color:rgba(180,200,220,0.3);">↗ 与 Claude 思辨</button>
-        <button class="btn" onclick="clearWrite()">清空</button>
+        <button class="btn" onclick="clearWrite()" id="btnClear">清空</button>
       </div>
     </div>
   </section>
@@ -647,7 +647,8 @@ function switchLang(lang){
 function refreshUI(){
   document.getElementById('appTitle').textContent = L==='zh'?'思·在':'Thinking · Being';
   document.getElementById('appSubtitle').textContent = L==='zh'?'THINKING · BEING':'A PHILOSOPHICAL GARDEN';
-  document.getElementById('apiStatus').textContent = apiOnline
+  const as = document.getElementById('apiStatus');
+  if(as) as.textContent = apiOnline
     ? (L==='zh'?'AI 实时生成 · 已连接':'AI Live · Connected')
     : t('status_local');
   document.querySelectorAll('nav button').forEach(b=>{
@@ -656,13 +657,18 @@ function refreshUI(){
     if(p==='write') b.textContent = t('nav_write');
     if(p==='garden') b.textContent = t('nav_garden');
   });
-  document.getElementById('writeArea').placeholder = t('write_placeholder');
-  document.querySelector('#panel-write .btn.primary').textContent = editingId ? t('saving_update') : t('saving_star');
-  document.getElementById('btnSend').textContent = t('btn_send');
-  document.querySelector('#panel-write .btn:nth-child(3)').textContent = t('btn_clear');
+  const wa = document.getElementById('writeArea');
+  if(wa) wa.placeholder = t('write_placeholder');
+  const saveBtn = document.querySelector('#panel-write .btn.primary');
+  if(saveBtn) saveBtn.textContent = editingId ? t('saving_update') : t('saving_star');
+  const sendBtn = document.getElementById('btnSend');
+  if(sendBtn) sendBtn.textContent = t('btn_send');
+  const clearBtn = document.getElementById('btnClear');
+  if(clearBtn) clearBtn.textContent = t('btn_clear');
   if(currentQuestion) displayQuestion(currentQuestion);
   renderGarden();
-  document.getElementById('gardenEmpty').innerHTML = t('garden_empty');
+  const ge = document.getElementById('gardenEmpty');
+  if(ge) ge.innerHTML = t('garden_empty');
 }
 
 // Load saved language
@@ -981,7 +987,15 @@ function getDailyQuestion() {
   if (stored) {
     try {
       const data = JSON.parse(stored);
-      if (data.date === today && data.q) return data;
+      // 旧缓存可能没有 en 字段，补齐
+      if (data.date === today && data.q) {
+        if (!data.en && data.index !== undefined && QUESTION_BANK[data.index]) {
+          data.en = QUESTION_BANK[data.index].en;
+          data.enSrc = QUESTION_BANK[data.index].enSrc;
+          localStorage.setItem('sizai_daily', JSON.stringify(data));
+        }
+        return data;
+      }
     } catch(e) {}
   }
   // Pick: avoid recently used daily questions
