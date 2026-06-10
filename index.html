@@ -343,63 +343,6 @@
     line-height: 2;
   }
 
-  .music-form {
-    display: flex; flex-direction: column; gap: 14px;
-  }
-  .music-form input, .music-form textarea {
-    width: 100%;
-    background: rgba(10,10,20,0.5);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 16px;
-    color: var(--text);
-    font-family: var(--font-cn);
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.3s;
-  }
-  .music-form input:focus, .music-form textarea:focus {
-    border-color: rgba(212,168,84,0.4);
-  }
-  .music-form textarea { min-height: 80px; resize: vertical; }
-  .music-list {
-    margin-top: 20px;
-    display: flex; flex-direction: column; gap: 12px;
-  }
-  .music-entry {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 20px;
-    display: flex; gap: 16px; align-items: flex-start;
-    transition: all 0.2s;
-  }
-  .music-entry:hover { border-color: rgba(212,168,84,0.2); }
-  .music-entry .album-art {
-    width: 48px; height: 48px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #2a2a3a, #1a1a2a);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.2rem; flex-shrink: 0;
-  }
-  .music-entry .info { flex:1; min-width:0; }
-  .music-entry .song-name {
-    font-weight: 600; color: var(--text-bright);
-    font-size: 0.95rem;
-  }
-  .music-entry .artist {
-    font-size: 0.8rem; color: rgba(200,200,220,0.45);
-    margin-top: 2px;
-  }
-  .music-entry .feeling {
-    font-size: 0.85rem; color: var(--text);
-    margin-top: 6px; line-height: 1.5;
-  }
-  .music-entry .m-date {
-    font-size: 0.7rem; color: rgba(200,200,220,0.25);
-    margin-top: 4px;
-  }
-
   .toast {
     position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
     background: rgba(30,30,50,0.9);
@@ -533,7 +476,6 @@
     <button data-panel="write">✎ 书写</button>
     <button data-panel="garden">✦ 思之星辰</button>
     <button data-panel="dialogue">↗ 对话</button>
-    <button data-panel="music">♪ 音乐</button>
   </nav>
 
   <!-- QUESTION PANEL -->
@@ -611,19 +553,6 @@
     <div class="empty-state" id="dialogueEmpty">
       还没有发送过思辨文字。<br>去「书写」那里，写下你的想法，<br>然后点击「与 Claude 思辨」。
     </div>
-  </section>
-
-  <!-- MUSIC PANEL -->
-  <section class="panel" id="panel-music">
-    <div class="card">
-      <div class="music-form">
-        <input type="text" id="songName" placeholder="歌曲名">
-        <input type="text" id="artistName" placeholder="艺术家 / 音乐人">
-        <textarea id="musicFeeling" placeholder="这首歌让你想到了什么？它带给你什么样的感受？"></textarea>
-        <button class="btn primary" onclick="saveMusic()" style="align-self:flex-start;">♫ 记录此刻的聆听</button>
-      </div>
-    </div>
-    <div class="music-list" id="musicList"></div>
   </section>
 
   <!-- MODAL -->
@@ -1101,7 +1030,6 @@ document.querySelectorAll('nav button').forEach(btn => {
     document.getElementById('panel-' + panelName).classList.add('active');
     if (panelName === 'garden') renderGarden();
     if (panelName === 'dialogue') renderDialogue();
-    if (panelName === 'music') renderMusic();
     if (panelName === 'question' && currentQuestion) displayQuestion(currentQuestion);
   });
 });
@@ -1296,7 +1224,7 @@ function renderGarden() {
     star.className = 'entry-star ' + p.sizeClass;
     star.style.left = p.x + 'px';
     star.style.top = p.y + 'px';
-    star.onclick = () => openEntry(e.id);
+    star.onclick = () => openStarInWriter(e.id);
 
     // Stable tooltip via global detached element (no DOM nesting flicker)
     let hideTimer;
@@ -1406,6 +1334,38 @@ function openEntry(id) {
 
   document.getElementById('modalContent').innerHTML = bodyHTML;
   document.getElementById('modalOverlay').style.display = 'flex';
+}
+
+function openStarInWriter(id) {
+  const entries = getEntries();
+  const e = entries.find(en => en.id === id);
+  if (!e) return;
+  // 把星辰的文字和 prompt 载入书写面板
+  document.getElementById('writeArea').value = e.text;
+  currentPrompt = e.prompt || '';
+  editingId = id;
+  if (currentPrompt) {
+    document.getElementById('promptRef').textContent = '「' + currentPrompt.slice(0, 50) + '…」';
+  } else {
+    document.getElementById('promptRef').textContent = '';
+  }
+  // 显示线程状态
+  if (e.thread && e.thread.length > 0) {
+    const rounds = Math.floor(e.thread.length / 2);
+    document.getElementById('writeMeta').innerHTML =
+      '<span style="color:var(--accent);">✦ 对话中</span>'
+      + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">' + rounds + ' 轮对话 · 发送新消息会追加到这颗星</span>';
+  } else {
+    document.getElementById('writeMeta').innerHTML =
+      '<span style="color:var(--accent);">✦ 编辑</span>'
+      + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">发送给 Claude 后将保存为线程</span>';
+  }
+  document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存';
+  switchPanel('write');
+  updateCharCount();
+  document.getElementById('writeArea').focus();
+  // 光标移到末尾
+  document.getElementById('writeArea').setSelectionRange(e.text.length, e.text.length);
 }
 
 function editEntry(id) {
@@ -1746,65 +1706,6 @@ function closeModal(e) {
 }
 
 // ═══════════════════════════════════════
-//  MUSIC
-// ═══════════════════════════════════════
-function getMusicEntries() {
-  try { return JSON.parse(localStorage.getItem('sizai_music')) || []; }
-  catch(e) { return []; }
-}
-
-function saveMusic() {
-  const name = document.getElementById('songName').value.trim();
-  const artist = document.getElementById('artistName').value.trim();
-  const feeling = document.getElementById('musicFeeling').value.trim();
-  if (!name) { toast('至少填一下歌名吧'); return; }
-
-  const entries = getMusicEntries();
-  entries.unshift({
-    id: Date.now(),
-    name, artist: artist || '未知', feeling,
-    date: new Date().toISOString(),
-  });
-  localStorage.setItem('sizai_music', JSON.stringify(entries));
-  document.getElementById('songName').value = '';
-  document.getElementById('artistName').value = '';
-  document.getElementById('musicFeeling').value = '';
-  renderMusic();
-  toast('♫ 已记录');
-}
-
-function deleteMusic(id) {
-  let entries = getMusicEntries();
-  entries = entries.filter(e => e.id !== id);
-  localStorage.setItem('sizai_music', JSON.stringify(entries));
-  renderMusic();
-}
-
-function renderMusic() {
-  const entries = getMusicEntries();
-  const list = document.getElementById('musicList');
-  if (entries.length === 0) {
-    list.innerHTML = '<div class="empty-state" style="padding:30px;">还没有记录音乐。<br>听到触动你的歌时，来这里记下。</div>';
-    return;
-  }
-  list.innerHTML = entries.map(e => {
-    const date = new Date(e.date).toLocaleDateString('zh-CN', {
-      month: 'short', day: 'numeric'
-    });
-    return `
-      <div class="music-entry">
-        <div class="album-art">♪</div>
-        <div class="info">
-          <div class="song-name">${escapeHtml(e.name)}</div>
-          <div class="artist">${escapeHtml(e.artist)}</div>
-          ${e.feeling ? '<div class="feeling">' + escapeHtml(e.feeling) + '</div>' : ''}
-          <div class="m-date">${date} · <a href="#" onclick="deleteMusic(${e.id});return false;" style="color:inherit;">删除</a></div>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-// ═══════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════
 function escapeHtml(s) {
@@ -1853,7 +1754,6 @@ function positionTooltip(tooltip, star) {
 // ═══════════════════════════════════════
 displayQuestion();
 renderGarden();
-renderMusic();
 updateCharCount();
 checkAPIStatus();
 
