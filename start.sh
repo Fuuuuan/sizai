@@ -1,27 +1,24 @@
 #!/bin/bash
-# 思·在 — 启动脚本
-# 同时启动 AI 生成服务器和打开浏览器
+# 思·在 — 一键启动
+# 先清理旧进程，再启动服务器，然后打开浏览器
 
 cd "$(dirname "$0")"
 
-echo "🚀 启动 思·在…"
-echo ""
+# Kill any old server on this port
+lsof -ti:8899 2>/dev/null | xargs kill -9 2>/dev/null
 
-# Start the Python server in the background
+# Start server
 python3 server.py &
 SERVER_PID=$!
-
-# Wait for server to be ready
 sleep 1
 
-# Open in browser
+# Open browser
 open http://localhost:8899
 
 echo ""
-echo "📡 AI 服务器运行中 (PID: $SERVER_PID)"
-echo "🌐 浏览器已打开 http://localhost:8899"
+echo "  思·在 已启动"
+echo "  浏览器: http://localhost:8899"
+echo "  停止: 关闭这个窗口 或 kill $SERVER_PID"
 echo ""
-echo "按 Ctrl+C 停止服务器"
 
-# Wait for server to finish
-wait $SERVER_PID
+wait $SERVER_PID 2>/dev/null
