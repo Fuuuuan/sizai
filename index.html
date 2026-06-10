@@ -1032,7 +1032,7 @@ function renderGarden() {
 
     return '<div class="garden-card" onclick="openStarInWriter(' + e.id + ')">'
       + '<div class="gc-date">' + dateStr + ' · ' + timeStr + '</div>'
-      + (e.prompt ? '<div class="gc-prompt">「' + escapeHtml(e.prompt.slice(0, 100)) + '」</div>' : '')
+      + (e.prompt ? '<div class="gc-prompt">回应：「' + escapeHtml(e.prompt) + '」</div>' : '<div class="gc-prompt" style="color:rgba(200,200,220,0.2);">自由书写</div>')
       + '<div class="gc-preview">' + escapeHtml(e.text) + '</div>'
       + '<div class="gc-meta">'
       + threadInfo
