@@ -78,6 +78,29 @@
     background: rgba(200,200,200,0.06);
     color: rgba(200,200,220,0.35);
   }
+  .lang-toggle {
+    position: absolute; top: 16px; right: 20px;
+    z-index: 10;
+  }
+  .lang-toggle button {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(200,200,220,0.4);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem; cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.2s;
+  }
+  .lang-toggle button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .lang-toggle button.active-lang {
+    background: var(--accent-dim);
+    border-color: rgba(212,168,84,0.3);
+    color: var(--accent);
+  }
 
   nav {
     display: flex; justify-content: center; gap: 4px;
@@ -396,8 +419,12 @@
 
 <div id="app">
   <header>
-    <h1>思·在</h1>
-    <div class="subtitle">THINKING · BEING</div>
+    <div class="lang-toggle" id="langToggle">
+      <button onclick="switchLang('zh')" id="btnZh">中</button>
+      <button onclick="switchLang('en')" id="btnEn">EN</button>
+    </div>
+    <h1 id="appTitle">思·在</h1>
+    <div class="subtitle" id="appSubtitle">THINKING · BEING</div>
     <div class="api-status offline" id="apiStatus">本地题库</div>
   </header>
 
@@ -460,10 +487,173 @@
 
 <script>
 // ═══════════════════════════════════════
+//  I18N — LANGUAGE SYSTEM
+// ═══════════════════════════════════════
+let L = 'zh';
+const T = {
+  zh: {
+    status_local: '本地题库',
+    status_online: 'AI 实时生成 · 已连接',
+    status_server: '服务器已连接 · 本地题库',
+    nav_question: '🜁 每日一问',
+    nav_write: '✎ 书写',
+    nav_garden: '✦ 思之星辰',
+    q_label_today: '今日之问',
+    q_label_ai: 'AI 之问',
+    q_badge: '实时生成',
+    btn_refresh: '↻ 换一个问题',
+    btn_ai: '✦ AI 生成',
+    btn_respond: '✎ 回应这个问题',
+    write_placeholder: '此刻，你在想什么？…',
+    btn_save: '✦ 保存为星辰',
+    btn_save_star: '✦ 保存',
+    btn_send: '↗ 与 Claude 思辨',
+    btn_clear: '清空',
+    toast_empty: '先写点什么吧',
+    toast_saved: '已保存 ✦ 它已经变成一颗星',
+    toast_updated: '已更新 ✦ 星辰被重新点亮',
+    toast_deleted: '已删除',
+    toast_ai_question: '✦ AI 生成的全新问题',
+    toast_ai_offline: 'AI 服务器未连接，使用本地题库',
+    toast_ai_fail: '生成失败，使用本地题库',
+    toast_claude_replied: '已追加到星辰 ✦ Claude 已回复',
+    toast_claude_wait: '已追加到星辰 · 等待 Claude 回复',
+    toast_claude_saved: '已存入星辰 · 在电脑上继续对话',
+    toast_thread_replied: '🌿 Claude 已回复',
+    toast_thread_sent: '已发送 · 等待回复',
+    toast_copied: '已复制到剪贴板 · 粘贴到 Claude 对话中',
+    garden_empty: '还没有文字。<br>去「书写」那里留下你的第一个想法吧。',
+    write_meta_edit: '✦ 编辑',
+    write_meta_edit_hint: '修改后保存，或发送给 Claude 开始对话',
+    write_meta_thread: '✦ 对话中 · ',
+    write_meta_thread_hint: '输入新内容后发送，会追加到这颗星辰',
+    write_meta_editing: '✦ 编辑模式',
+    write_meta_editing_hint: '修改后将更新这颗星辰',
+    write_meta_sending: '↗ 正在发送给 Claude…',
+    prompt_prefix: '回应：「',
+    prompt_continue: '继续这段对话…',
+    modal_edited: '（已编辑）',
+    modal_edit_btn: '✎ 编辑',
+    modal_claude_btn: '↗ 与 Claude 思辨',
+    modal_close: '关闭',
+    modal_edit_text: '✎ 编辑文字',
+    modal_send: '↗ 发送',
+    modal_offline_hint: '在电脑上打开思在，连接 Claude 继续这段对话',
+    thread_you: '💭 你',
+    thread_claude: '🌿 Claude',
+    thread_expand: '展开',
+    thread_collapse: '收起',
+    gc_free: '自由书写',
+    gc_rounds: ' 轮对话',
+    gc_delete: '删除',
+    spinner_sending: '思考中…',
+    spinner_reading: 'Claude 正在读你的文字…',
+    toast_clipboard: '已复制到剪贴板 · 粘贴到 Claude 对话中',
+    saving_star: '✦ 保存为星辰',
+    saving_update: '✦ 保存',
+    clear_placeholder: '此刻，你在想什么？…',
+  },
+  en: {
+    status_local: 'Local Library',
+    status_online: 'AI Live · Connected',
+    status_server: 'Server Connected · Local Library',
+    nav_question: '🜁 Daily Question',
+    nav_write: '✎ Write',
+    nav_garden: '✦ Garden',
+    q_label_today: 'Today\'s Question',
+    q_label_ai: 'AI Question',
+    q_badge: 'Live',
+    btn_refresh: '↻ New Question',
+    btn_ai: '✦ AI Generate',
+    btn_respond: '✎ Respond',
+    write_placeholder: 'What are you thinking about right now?…',
+    btn_save: '✦ Save as Star',
+    btn_save_star: '✦ Save',
+    btn_send: '↗ Dialogue with Claude',
+    btn_clear: 'Clear',
+    toast_empty: 'Write something first',
+    toast_saved: 'Saved ✦ It has become a star',
+    toast_updated: 'Updated ✦ Star rekindled',
+    toast_deleted: 'Deleted',
+    toast_ai_question: '✦ AI generated a new question',
+    toast_ai_offline: 'AI server offline, using local library',
+    toast_ai_fail: 'Generation failed, using local library',
+    toast_claude_replied: 'Added to star ✦ Claude replied',
+    toast_claude_wait: 'Added to star · Awaiting Claude',
+    toast_claude_saved: 'Saved to star · Continue on computer',
+    toast_thread_replied: '🌿 Claude replied',
+    toast_thread_sent: 'Sent · Awaiting reply',
+    toast_copied: 'Copied · Paste into Claude',
+    garden_empty: 'Nothing here yet.<br>Go to Write and leave your first thought.',
+    write_meta_edit: '✦ Edit',
+    write_meta_edit_hint: 'Edit and save, or send to Claude to start a dialogue',
+    write_meta_thread: '✦ In Dialogue · ',
+    write_meta_thread_hint: 'Write something new and send — it will be added to this star',
+    write_meta_editing: '✦ Editing',
+    write_meta_editing_hint: 'Changes will update this star',
+    write_meta_sending: '↗ Sending to Claude…',
+    prompt_prefix: 'Responding to: 「',
+    prompt_continue: 'Continue this dialogue…',
+    modal_edited: '(edited)',
+    modal_edit_btn: '✎ Edit',
+    modal_claude_btn: '↗ Dialogue with Claude',
+    modal_close: 'Close',
+    modal_edit_text: '✎ Edit Text',
+    modal_send: '↗ Send',
+    modal_offline_hint: 'Open 思在 on your computer to continue this dialogue with Claude',
+    thread_you: '💭 You',
+    thread_claude: '🌿 Claude',
+    thread_expand: 'Expand',
+    thread_collapse: 'Collapse',
+    gc_free: 'Free writing',
+    gc_rounds: ' rounds',
+    gc_delete: 'Delete',
+    spinner_sending: 'Thinking…',
+    spinner_reading: 'Claude is reading your words…',
+    toast_clipboard: 'Copied · Paste into Claude',
+    saving_star: '✦ Save as Star',
+    saving_update: '✦ Update Star',
+    clear_placeholder: 'What are you thinking about right now?…',
+  }
+};
+function t(k){ return (T[L] && T[L][k]) || (T['zh'][k] || k); }
+function switchLang(lang){
+  L = lang;
+  localStorage.setItem('sizai_lang', L);
+  document.getElementById('btnZh').className = L==='zh'?'active-lang':'';
+  document.getElementById('btnEn').className = L==='en'?'active-lang':'';
+  refreshUI();
+}
+function refreshUI(){
+  document.getElementById('appTitle').textContent = L==='zh'?'思·在':'Thinking · Being';
+  document.getElementById('appSubtitle').textContent = L==='zh'?'THINKING · BEING':'A PHILOSOPHICAL GARDEN';
+  document.getElementById('apiStatus').textContent = apiOnline
+    ? (L==='zh'?'AI 实时生成 · 已连接':'AI Live · Connected')
+    : t('status_local');
+  document.querySelectorAll('nav button').forEach(b=>{
+    const p = b.dataset.panel;
+    if(p==='question') b.textContent = t('nav_question');
+    if(p==='write') b.textContent = t('nav_write');
+    if(p==='garden') b.textContent = t('nav_garden');
+  });
+  document.getElementById('writeArea').placeholder = t('write_placeholder');
+  document.querySelector('#panel-write .btn.primary').textContent = editingId ? t('saving_update') : t('saving_star');
+  document.getElementById('btnSend').textContent = t('btn_send');
+  document.querySelector('#panel-write .btn:nth-child(3)').textContent = t('btn_clear');
+  if(currentQuestion) displayQuestion(currentQuestion);
+  renderGarden();
+  document.getElementById('gardenEmpty').innerHTML = t('garden_empty');
+}
+
+// Load saved language
+const savedLang = localStorage.getItem('sizai_lang');
+if(savedLang && (savedLang==='zh' || savedLang==='en')) L = savedLang;
+document.getElementById('btnZh').className = L==='zh'?'active-lang':'';
+document.getElementById('btnEn').className = L==='en'?'active-lang':'';
+
+// ═══════════════════════════════════════
 //  CONFIGURATION
 // ═══════════════════════════════════════
-// 部署后把下面这行改成你的 Render URL，例如：
-// const API_BASE = 'https://sizai-xxxx.onrender.com';
 const API_BASE = 'http://localhost:8899';
 
 // ═══════════════════════════════════════
@@ -539,212 +729,212 @@ drawStars();
 //  QUESTION BANK (200+ questions)
 // ═══════════════════════════════════════
 const QUESTION_BANK = [
-  // ── 存在与自我 ──
-  { q: "如果「自我」只是一串不断变化的记忆和感受，那「我」到底是谁？", src: "—— 佛教「无我」与休谟的怀疑" },
-  { q: "你是否曾经在某个瞬间，感到与整个世界融为一体？那个瞬间发生了什么？", src: "—— 神秘主义体验与宇宙意识" },
-  { q: "当你独处时，你是谁？当你和不同的人在一起时，你还是同一个人吗？", src: "—— 社会自我与真实自我" },
-  { q: "身体是你的一部分，还是你就是你的身体？如果你的身体换了，你还是你吗？", src: "—— 具身认知与人格同一性" },
-  { q: "你梦里的那个「你」，和现在醒着的「你」，是同一个「你」吗？", src: "—— 庄子梦蝶与意识连续性问题" },
-  { q: "如果有两个一模一样的你——同样的记忆、性格、身体——哪个才是真正的你？", src: "—— 人格同一性的思想实验" },
-  { q: "你的名字是你吗？如果换一个名字活一辈子，你会变成另一个人吗？", src: "—— 语言与身份构建" },
-  { q: "「做自己」是什么意思？如果「自己」本身就在不断变化，你该做哪一个自己？", src: "—— 存在先于本质" },
-  { q: "你是不是你所有选择的总和？那没做的那些选择，它们也是你的一部分吗？", src: "—— 可能性与真实性" },
-  { q: "此刻正在读这句话的「你」，和昨天那个「你」，是同一个存在吗？", src: "—— 时间中的自我同一性" },
-  { q: "如果一个人的记忆被完全抹去，他是否变成了另一个人？", src: "—— 洛克论人格同一性" },
-  { q: "你觉得自己最「像自己」的时刻是什么时候？", src: "—— 本真性的现象学" },
+  // ── 存在与自我 / Existence & Self ──
+  { q: "如果「自我」只是一串不断变化的记忆和感受，那「我」到底是谁？", en: "If the 'self' is nothing but a stream of shifting memories and feelings, then who am 'I,' really?", src: "—— 佛教「无我」与休谟的怀疑", enSrc: "— Buddhist 'no-self' & Hume's skepticism" },
+  { q: "你是否曾经在某个瞬间，感到与整个世界融为一体？那个瞬间发生了什么？", en: "Have you ever felt, in a single moment, that you merged with the entire world? What happened in that moment?", src: "—— 神秘主义体验与宇宙意识", enSrc: "— Mystical experience & cosmic consciousness" },
+  { q: "当你独处时，你是谁？当你和不同的人在一起时，你还是同一个人吗？", en: "Who are you when you are alone? And when you're with different people — are you still the same person?", src: "—— 社会自我与真实自我", enSrc: "— Social self vs. authentic self" },
+  { q: "身体是你的一部分，还是你就是你的身体？如果你的身体换了，你还是你吗？", en: "Is your body a part of you, or are you your body? If your body were replaced, would you still be you?", src: "—— 具身认知与人格同一性", enSrc: "— Embodied cognition & personal identity" },
+  { q: "你梦里的那个「你」，和现在醒着的「你」，是同一个「你」吗？", en: "Is the 'you' in your dreams the same 'you' that is awake right now?", src: "—— 庄子梦蝶与意识连续性问题", enSrc: "— Zhuangzi's butterfly dream & continuity of consciousness" },
+  { q: "如果有两个一模一样的你——同样的记忆、性格、身体——哪个才是真正的你？", en: "If there were two identical copies of you — same memories, personality, body — which one would be the real you?", src: "—— 人格同一性的思想实验", enSrc: "— Thought experiment on personal identity" },
+  { q: "你的名字是你吗？如果换一个名字活一辈子，你会变成另一个人吗？", en: "Is your name you? If you lived your whole life under a different name, would you become a different person?", src: "—— 语言与身份构建", enSrc: "— Language & identity construction" },
+  { q: "「做自己」是什么意思？如果「自己」本身就在不断变化，你该做哪一个自己？", en: "What does 'be yourself' even mean? If the self is always changing, which version of yourself are you supposed to be?", src: "—— 存在先于本质", enSrc: "— Existence precedes essence" },
+  { q: "你是不是你所有选择的总和？那没做的那些选择，它们也是你的一部分吗？", en: "Are you the sum of all your choices? What about the choices you didn't make — are they part of you too?", src: "—— 可能性与真实性", enSrc: "— Possibility & authenticity" },
+  { q: "此刻正在读这句话的「你」，和昨天那个「你」，是同一个存在吗？", en: "Is the 'you' reading this sentence right now the same being as the 'you' from yesterday?", src: "—— 时间中的自我同一性", enSrc: "— Self-identity across time" },
+  { q: "如果一个人的记忆被完全抹去，他是否变成了另一个人？", en: "If a person's memory were completely erased, would they become someone else?", src: "—— 洛克论人格同一性", enSrc: "— Locke on personal identity" },
+  { q: "你觉得自己最「像自己」的时刻是什么时候？", en: "When do you feel most like 'yourself'?", src: "—— 本真性的现象学", enSrc: "— Phenomenology of authenticity" },
 
-  // ── 自由与选择 ──
-  { q: "自由意志真的存在吗？如果你的每一个决定都可以被先前的因果链条解释——那「选择」意味着什么？", src: "—— 决定论 vs 自由意志" },
-  { q: "什么是真正的自由？是不受约束，还是能够按照自己的意志去选择——即使那个意志本身是被塑造的？", src: "—— 积极自由与消极自由" },
-  { q: "选择越多就越自由吗？还是选择本身变成了一种负担？", src: "—— 选择悖论与存在主义" },
-  { q: "当你「不选择」的时候，你其实已经做了一个选择——这个说法对吗？", src: "—— 萨特：「人被判定为自由」" },
-  { q: "如果有一个机器能让你体验任何你想要的人生——你会按那个按钮吗？", src: "—— 诺齐克的体验机器" },
-  { q: "你觉得你的生活中有多少是真正由你决定的？10%？50%？还是 0%？", src: "—— 宿命论与能动性" },
-  { q: "后悔意味着什么？它是否暗示着我们在那个时刻原本「可以」做出不同的选择？", src: "—— 自由意志与道德责任" },
-  { q: "如果科学证明自由意志是一种幻觉，你还会为自己的选择感到骄傲或羞愧吗？", src: "—— 神经决定论的伦理后果" },
-  { q: "你愿意放弃多少自由来换取安全感和确定性？", src: "—— 自由与安全的辩证" },
+  // ── 自由与选择 / Freedom & Choice ──
+  { q: "自由意志真的存在吗？如果你的每一个决定都可以被先前的因果链条解释——那「选择」意味着什么？", en: "Does free will actually exist? If every decision you make can be explained by a prior causal chain — what does 'choice' even mean?", src: "—— 决定论 vs 自由意志", enSrc: "— Determinism vs. free will" },
+  { q: "什么是真正的自由？是不受约束，还是能够按照自己的意志去选择——即使那个意志本身是被塑造的？", en: "What is true freedom? Freedom from constraints, or the ability to choose according to your own will — even if that will itself was shaped by forces beyond you?", src: "—— 积极自由与消极自由", enSrc: "— Positive & negative freedom" },
+  { q: "选择越多就越自由吗？还是选择本身变成了一种负担？", en: "Does more choice mean more freedom? Or does choice itself become a burden?", src: "—— 选择悖论与存在主义", enSrc: "— Paradox of choice & existentialism" },
+  { q: "当你「不选择」的时候，你其实已经做了一个选择——这个说法对吗？", en: "When you 'don't choose,' have you actually already made a choice? Is that argument valid?", src: "—— 萨特：「人被判定为自由」", enSrc: "— Sartre: 'Man is condemned to be free'" },
+  { q: "如果有一个机器能让你体验任何你想要的人生——你会按那个按钮吗？", en: "If there were a machine that could let you experience any life you wanted — would you press the button?", src: "—— 诺齐克的体验机器", enSrc: "— Nozick's experience machine" },
+  { q: "你觉得你的生活中有多少是真正由你决定的？10%？50%？还是 0%？", en: "How much of your life do you think is genuinely decided by you? 10%? 50%? Or 0%?", src: "—— 宿命论与能动性", enSrc: "— Fatalism & agency" },
+  { q: "后悔意味着什么？它是否暗示着我们在那个时刻原本「可以」做出不同的选择？", en: "What does regret mean? Does it imply that we actually could have made a different choice in that moment?", src: "—— 自由意志与道德责任", enSrc: "— Free will & moral responsibility" },
+  { q: "如果科学证明自由意志是一种幻觉，你还会为自己的选择感到骄傲或羞愧吗？", en: "If science proved free will is an illusion, would you still feel pride or shame about your choices?", src: "—— 神经决定论的伦理后果", enSrc: "— Ethical consequences of neuro-determinism" },
+  { q: "你愿意放弃多少自由来换取安全感和确定性？", en: "How much freedom would you trade for security and certainty?", src: "—— 自由与安全的辩证", enSrc: "— Freedom vs. security dialectic" },
 
-  // ── 虚无、荒谬与意义 ──
-  { q: "虚无是什么颜色？不是黑色——黑色也是一种颜色。试着描述「无」。", src: "—— 海德格尔与存在的边界" },
-  { q: "如果生命终将归于虚无，那此刻的意义从哪里来？", src: "—— 加缪与荒谬" },
-  { q: "如果「意义」是一种人类发明而不是宇宙属性——这意味着什么？是解放，还是虚无？", src: "—— 虚无主义与存在主义的岔路口" },
-  { q: "你害怕的到底是死亡本身，还是「不再存在」这个念头？", src: "—— 伊壁鸠鲁：「我在，死不在；死在，我不在」" },
-  { q: "西西弗斯推石头——你觉得他快乐吗？如果快乐，为什么？", src: "—— 加缪：「必须想象西西弗斯是快乐的」" },
-  { q: "当你觉得一切都没有意义的时候，是什么让你继续走下去？", src: "—— 日常生活中的存在主义" },
-  { q: "荒诞感是什么？它从哪里来？是世界的错，还是我们期待的错？", src: "—— 荒谬的诞生" },
-  { q: "如果你只有一个月可以活，你会怎么过？——那你现在为什么不那么过？", src: "—— 死亡的警醒与拖延" },
-  { q: "希望是一种美德，还是一种幻觉？它让你前行，还是让你逃避现实？", src: "—— 潘多拉魔盒与希望哲学" },
-  { q: "如果宇宙对你毫不在意——这是令人绝望的，还是令人释然的？", src: "—— 宇宙视角下的存在" },
-  { q: "虚无主义之后，还能有什么？", src: "—— 尼采与价值重估" },
+  // ── 虚无、荒谬与意义 / Nothingness, Absurdity & Meaning ──
+  { q: "虚无是什么颜色？不是黑色——黑色也是一种颜色。试着描述「无」。", en: "What color is nothingness? Not black — black is still a color. Try to describe 'nothing.'", src: "—— 海德格尔与存在的边界", enSrc: "— Heidegger & the boundary of being" },
+  { q: "如果生命终将归于虚无，那此刻的意义从哪里来？", en: "If life ultimately returns to nothingness, where does the meaning of this moment come from?", src: "—— 加缪与荒谬", enSrc: "— Camus & the absurd" },
+  { q: "如果「意义」是一种人类发明而不是宇宙属性——这意味着什么？是解放，还是虚无？", en: "If 'meaning' is a human invention rather than a property of the universe — is that liberating, or is it nihilism?", src: "—— 虚无主义与存在主义的岔路口", enSrc: "— Nihilism & existentialism at the crossroads" },
+  { q: "你害怕的到底是死亡本身，还是「不再存在」这个念头？", en: "Are you afraid of death itself, or of the thought of 'no longer existing'?", src: "—— 伊壁鸠鲁：「我在，死不在；死在，我不在」", enSrc: "— Epicurus: 'When I am, death is not; when death is, I am not'" },
+  { q: "西西弗斯推石头——你觉得他快乐吗？如果快乐，为什么？", en: "Sisyphus pushes his rock — do you think he is happy? If so, why?", src: "—— 加缪：「必须想象西西弗斯是快乐的」", enSrc: "— Camus: 'One must imagine Sisyphus happy'" },
+  { q: "当你觉得一切都没有意义的时候，是什么让你继续走下去？", en: "When everything feels meaningless, what keeps you going?", src: "—— 日常生活中的存在主义", enSrc: "— Existentialism in everyday life" },
+  { q: "荒诞感是什么？它从哪里来？是世界的错，还是我们期待的错？", en: "What is the feeling of absurdity? Where does it come from — is it the world's fault, or the fault of our expectations?", src: "—— 荒谬的诞生", enSrc: "— The birth of the absurd" },
+  { q: "如果你只有一个月可以活，你会怎么过？——那你现在为什么不那么过？", en: "If you had only one month to live, how would you spend it? — So why aren't you living that way now?", src: "—— 死亡的警醒与拖延", enSrc: "— Death as wake-up call & procrastination" },
+  { q: "希望是一种美德，还是一种幻觉？它让你前行，还是让你逃避现实？", en: "Is hope a virtue or an illusion? Does it help you move forward, or does it help you escape reality?", src: "—— 潘多拉魔盒与希望哲学", enSrc: "— Pandora's box & philosophy of hope" },
+  { q: "如果宇宙对你毫不在意——这是令人绝望的，还是令人释然的？", en: "If the universe is utterly indifferent to you — is that devastating, or is it a relief?", src: "—— 宇宙视角下的存在", enSrc: "— Existence from a cosmic perspective" },
+  { q: "虚无主义之后，还能有什么？", en: "After nihilism — what else is there?", src: "—— 尼采与价值重估", enSrc: "— Nietzsche & the revaluation of values" },
 
-  // ── 时间与存在 ──
-  { q: "你是在「度过」时间，还是在「成为」时间？", src: "—— 柏格森与绵延（durée）" },
-  { q: "「现在」有多长？一秒钟？一瞬间？还是「现在」根本不存在？", src: "—— 奥古斯丁与时间的悖论" },
-  { q: "过去还在吗？未来已经存在了吗？还是只有「此刻」是真实的？", src: "—— 时间哲学与永恒论" },
-  { q: "如果可以回到过去——你会选择保留现在的记忆，还是重新经历一次？两者的区别是什么？", src: "—— 记忆与经历的哲学差异" },
-  { q: "记忆是可靠的过去吗？还是每一次回忆，都是一次重新构造？", src: "—— 记忆哲学与叙事同一性" },
-  { q: "你是在用时间换生命，还是在用生命换时间？", src: "—— 时间经济学与生命价值" },
-  { q: "无聊的时间为什么过得慢，快乐的时间为什么过得快——时间有速度吗？", src: "—— 时间感知的现象学" },
-  { q: "如果你能暂停时间，那一刻你感受到的自由是什么？——以及随之而来的孤独是什么？", src: "—— 时间暂停思想实验" },
-  { q: "衰老是你，还是发生在你身上的事？", src: "—— 衰老哲学与身体自我" },
+  // ── 时间与存在 / Time & Being ──
+  { q: "你是在「度过」时间，还是在「成为」时间？", en: "Are you spending time, or are you becoming time?", src: "—— 柏格森与绵延（durée）", enSrc: "— Bergson & duration (durée)" },
+  { q: "「现在」有多长？一秒钟？一瞬间？还是「现在」根本不存在？", en: "How long is 'now'? One second? A single instant? Or does 'now' not exist at all?", src: "—— 奥古斯丁与时间的悖论", enSrc: "— Augustine & the paradox of time" },
+  { q: "过去还在吗？未来已经存在了吗？还是只有「此刻」是真实的？", en: "Does the past still exist? Has the future already happened? Or is only 'this moment' real?", src: "—— 时间哲学与永恒论", enSrc: "— Philosophy of time & eternalism" },
+  { q: "如果可以回到过去——你会选择保留现在的记忆，还是重新经历一次？两者的区别是什么？", en: "If you could go back to the past — would you keep your present memories, or experience it all fresh again? What's the difference between the two?", src: "—— 记忆与经历的哲学差异", enSrc: "— Philosophical difference between memory & experience" },
+  { q: "记忆是可靠的过去吗？还是每一次回忆，都是一次重新构造？", en: "Is memory a reliable record of the past? Or is every act of remembering an act of reconstruction?", src: "—— 记忆哲学与叙事同一性", enSrc: "— Philosophy of memory & narrative identity" },
+  { q: "你是在用时间换生命，还是在用生命换时间？", en: "Are you trading time for life, or life for time?", src: "—— 时间经济学与生命价值", enSrc: "— Time economics & the value of life" },
+  { q: "无聊的时间为什么过得慢，快乐的时间为什么过得快——时间有速度吗？", en: "Why does time crawl when you're bored and fly when you're happy — does time have a speed?", src: "—— 时间感知的现象学", enSrc: "— Phenomenology of time perception" },
+  { q: "如果你能暂停时间，那一刻你感受到的自由是什么？——以及随之而来的孤独是什么？", en: "If you could pause time, what freedom would you feel in that moment? — And what loneliness would follow?", src: "—— 时间暂停思想实验", enSrc: "— Time-stop thought experiment" },
+  { q: "衰老是你，还是发生在你身上的事？", en: "Is aging something you are, or something that happens to you?", src: "—— 衰老哲学与身体自我", enSrc: "— Philosophy of aging & the bodily self" },
 
-  // ── 死亡 ──
-  { q: "你自己的死亡——你能想象它吗？还是每次你尝试想象时，你其实都在「旁观」？", src: "—— 死亡的现象学困境" },
-  { q: "如果科技让你永生，你会选择永生吗？永生的代价是什么？", src: "—— 不朽与生命意义" },
-  { q: "你希望被记住吗？如果一千年后没有人记得你，你当下所做的一切还重要吗？", src: "—— 死亡与遗产" },
-  { q: "死是生命的一部分，还是生命的反面？", src: "—— 死亡的本体论" },
-  { q: "如果死后有来生——你会选择和这一世完全不同的人生，还是相似的人生？", src: "—— 永恒轮回与选择" },
-  { q: "你最害怕失去的是什么？那个东西有一天会失去吗？", src: "—— 死亡焦虑与执念" },
+  // ── 死亡 / Death ──
+  { q: "你自己的死亡——你能想象它吗？还是每次你尝试想象时，你其实都在「旁观」？", en: "Your own death — can you imagine it? Or is every attempt to do so really just you watching from the outside?", src: "—— 死亡的现象学困境", enSrc: "— Phenomenological dilemma of death" },
+  { q: "如果科技让你永生，你会选择永生吗？永生的代价是什么？", en: "If technology offered you immortality, would you take it? And what would immortality cost?", src: "—— 不朽与生命意义", enSrc: "— Immortality & the meaning of life" },
+  { q: "你希望被记住吗？如果一千年后没有人记得你，你当下所做的一切还重要吗？", en: "Do you want to be remembered? If no one remembers you in a thousand years, does anything you do right now matter?", src: "—— 死亡与遗产", enSrc: "— Death & legacy" },
+  { q: "死是生命的一部分，还是生命的反面？", en: "Is death a part of life, or the opposite of life?", src: "—— 死亡的本体论", enSrc: "— Ontology of death" },
+  { q: "如果死后有来生——你会选择和这一世完全不同的人生，还是相似的人生？", en: "If there is an afterlife — would you choose a life completely different from this one, or something similar?", src: "—— 永恒轮回与选择", enSrc: "— Eternal recurrence & choice" },
+  { q: "你最害怕失去的是什么？那个东西有一天会失去吗？", en: "What are you most afraid of losing? And will you lose it someday?", src: "—— 死亡焦虑与执念", enSrc: "— Death anxiety & attachment" },
 
-  // ── 意识与心灵 ──
-  { q: "你和他人的意识之间，隔着什么？你怎么知道别人也有内心世界？", src: "—— 他心问题（Problem of Other Minds）" },
-  { q: "如果有一个人工智能能够完美模拟人类的对话和情感——它拥有意识吗？你怎么判断？", src: "—— 图灵测试与意识的难题" },
-  { q: "意识是什么？它是大脑产生的一种「分泌物」，还是一种根本不同的东西？", src: "—— 心身问题与「困难问题」" },
-  { q: "颜色存在于哪里？在物体表面，在你的眼睛里，还是在你的意识里？", src: "—— 感受质（Qualia）与主观经验" },
-  { q: "如果你能「进入」另一个人的意识一秒钟，你会想体验什么？", src: "—— 主体间性与同理心的极限" },
-  { q: "动物有意识吗？一只猫、一只鸟、一只蚂蚁——你在哪里划那条线？", src: "—— 动物意识与道德圈" },
-  { q: "当你「想」一件事的时候——那个「想」是什么材质的？它有形状吗？", src: "—— 思维的现象学" },
-  { q: "「我思故我在」——如果停止思考，「我」还存在吗？", src: "—— 笛卡尔与存在的根基" },
-  { q: "为什么会有「意识」这个东西存在？一个没有意识的世界不是更「经济」吗？", src: "—— 意识的进化谜题" },
+  // ── 意识与心灵 / Consciousness & Mind ──
+  { q: "你和他人的意识之间，隔着什么？你怎么知道别人也有内心世界？", en: "What stands between your consciousness and another's? How do you even know that other people have inner worlds?", src: "—— 他心问题（Problem of Other Minds）", enSrc: "— The Problem of Other Minds" },
+  { q: "如果有一个人工智能能够完美模拟人类的对话和情感——它拥有意识吗？你怎么判断？", en: "If an AI could perfectly simulate human conversation and emotion — would it have consciousness? How would you tell?", src: "—— 图灵测试与意识的难题", enSrc: "— The Turing test & the hard problem of consciousness" },
+  { q: "意识是什么？它是大脑产生的一种「分泌物」，还是一种根本不同的东西？", en: "What is consciousness? Is it a 'byproduct' of the brain, or something fundamentally different?", src: "—— 心身问题与「困难问题」", enSrc: "— Mind-body problem & the hard problem" },
+  { q: "颜色存在于哪里？在物体表面，在你的眼睛里，还是在你的意识里？", en: "Where does color exist? On the surface of objects, in your eyes, or in your consciousness?", src: "—— 感受质（Qualia）与主观经验", enSrc: "— Qualia & subjective experience" },
+  { q: "如果你能「进入」另一个人的意识一秒钟，你会想体验什么？", en: "If you could 'enter' another person's consciousness for one second — what would you want to experience?", src: "—— 主体间性与同理心的极限", enSrc: "— Intersubjectivity & the limits of empathy" },
+  { q: "动物有意识吗？一只猫、一只鸟、一只蚂蚁——你在哪里划那条线？", en: "Are animals conscious? A cat, a bird, an ant — where do you draw the line?", src: "—— 动物意识与道德圈", enSrc: "— Animal consciousness & the moral circle" },
+  { q: "当你「想」一件事的时候——那个「想」是什么材质的？它有形状吗？", en: "When you 'think' about something — what is that thought made of? Does it have a shape?", src: "—— 思维的现象学", enSrc: "— Phenomenology of thinking" },
+  { q: "「我思故我在」——如果停止思考，「我」还存在吗？", en: "'I think, therefore I am' — if you stop thinking, does the 'I' still exist?", src: "—— 笛卡尔与存在的根基", enSrc: "— Descartes & the foundation of existence" },
+  { q: "为什么会有「意识」这个东西存在？一个没有意识的世界不是更「经济」吗？", en: "Why does consciousness exist at all? Wouldn't a world without consciousness be more 'efficient'?", src: "—— 意识的进化谜题", enSrc: "— The evolutionary puzzle of consciousness" },
 
-  // ── 语言与真实 ──
-  { q: "语言是思想的容器，还是思想的牢笼？那些你说不出的感受，它们真实存在吗？", src: "—— 维特根斯坦：「语言的边界就是世界的边界」" },
-  { q: "沉默可以是一种语言吗？如果可以，它在说什么？", src: "—— 沉默哲学与「不说之说」" },
-  { q: "如果你从未学过任何语言，你还能思考吗？你的思考会是什么样子？", src: "—— 语言与思维的关系" },
-  { q: "有没有一种感受，你确定它存在，但你永远无法用语言传达给别人？", src: "—— 私人语言论证" },
-  { q: "「真实」这个词本身是真实的吗？还是它只是一个方便的标签？", src: "—— 语言与实在论" },
-  { q: "当你说「我爱你」的时候，这三个字传达的是什么？是你真实的感受，还是一个社会约定的符号？", src: "—— 言语行为与情感真实性" },
-  { q: "谎言和虚构有什么区别？文学小说是不是一种「美丽的谎言」？", src: "—— 虚构哲学与真理" },
-  { q: "如果你把一生所有的话都录下来——那些话加起来，是你的全部吗？", src: "—— 语言与存在的总和" },
+  // ── 语言与真实 / Language & Truth ──
+  { q: "语言是思想的容器，还是思想的牢笼？那些你说不出的感受，它们真实存在吗？", en: "Is language a container for thought, or a prison? Those feelings you can't put into words — do they truly exist?", src: "—— 维特根斯坦：「语言的边界就是世界的边界」", enSrc: "— Wittgenstein: 'The limits of my language mean the limits of my world'" },
+  { q: "沉默可以是一种语言吗？如果可以，它在说什么？", en: "Can silence be a language? If so, what is it saying?", src: "—— 沉默哲学与「不说之说」", enSrc: "— Philosophy of silence & 'speaking without speaking'" },
+  { q: "如果你从未学过任何语言，你还能思考吗？你的思考会是什么样子？", en: "If you had never learned any language, could you still think? What would your thinking look like?", src: "—— 语言与思维的关系", enSrc: "— Language & thought" },
+  { q: "有没有一种感受，你确定它存在，但你永远无法用语言传达给别人？", en: "Is there a feeling you are certain exists, but can never convey to anyone else in words?", src: "—— 私人语言论证", enSrc: "— The private language argument" },
+  { q: "「真实」这个词本身是真实的吗？还是它只是一个方便的标签？", en: "Is the word 'truth' itself true? Or is it just a convenient label?", src: "—— 语言与实在论", enSrc: "— Language & realism" },
+  { q: "当你说「我爱你」的时候，这三个字传达的是什么？是你真实的感受，还是一个社会约定的符号？", en: "When you say 'I love you,' what do those three words actually convey — your real feelings, or a socially agreed-upon symbol?", src: "—— 言语行为与情感真实性", enSrc: "— Speech acts & emotional authenticity" },
+  { q: "谎言和虚构有什么区别？文学小说是不是一种「美丽的谎言」？", en: "What's the difference between a lie and fiction? Is a novel a kind of 'beautiful lie'?", src: "—— 虚构哲学与真理", enSrc: "— Philosophy of fiction & truth" },
+  { q: "如果你把一生所有的话都录下来——那些话加起来，是你的全部吗？", en: "If you recorded every word you ever spoke — would the sum of them be the whole of who you are?", src: "—— 语言与存在的总和", enSrc: "— Language & the sum of existence" },
 
-  // ── 爱与关系 ──
-  { q: "当你爱一个人的时候，你爱的是那个人本身，还是那个人给你带来的感受？", src: "—— 爱的现象学" },
-  { q: "爱是需求还是给予？如果你不需要任何人却还是选择了爱——那是什么？", src: "—— 爱的本质：匮乏还是溢出" },
-  { q: "你能完全了解另一个人吗？如果不能，你爱的是一个「真实的人」还是一个「你的投射」？", src: "—— 他者与爱情的认识论" },
-  { q: "孤独是缺少别人，还是缺少自己？", src: "—— 孤独的两种形态" },
-  { q: "「在一起」意味着什么？两个人在同一个空间、度过同一段时间——这就是「在一起」吗？", src: "—— 共在（Mitsein）的现象学" },
-  { q: "如果你爱一个人，你应该希望他们成为最好的自己——即使那个「最好的自己」不包括你吗？", src: "—— 爱的伦理与自我牺牲" },
-  { q: "人与人之间的「连接」是什么？它是一种实际存在的东西，还是一个我们共同制造的幻觉？", src: "—— 连接的本体论" },
+  // ── 爱与关系 / Love & Relations ──
+  { q: "当你爱一个人的时候，你爱的是那个人本身，还是那个人给你带来的感受？", en: "When you love someone, do you love the person, or the feelings they give you?", src: "—— 爱的现象学", enSrc: "— Phenomenology of love" },
+  { q: "爱是需求还是给予？如果你不需要任何人却还是选择了爱——那是什么？", en: "Is love a need or a gift? If you need no one and still choose to love — what is that?", src: "—— 爱的本质：匮乏还是溢出", enSrc: "— The nature of love: lack or overflow" },
+  { q: "你能完全了解另一个人吗？如果不能，你爱的是一个「真实的人」还是一个「你的投射」？", en: "Can you ever fully know another person? If not, are you loving a real person or a projection of yourself?", src: "—— 他者与爱情的认识论", enSrc: "— The Other & epistemology of love" },
+  { q: "孤独是缺少别人，还是缺少自己？", en: "Is loneliness the absence of others, or the absence of yourself?", src: "—— 孤独的两种形态", enSrc: "— Two forms of loneliness" },
+  { q: "「在一起」意味着什么？两个人在同一个空间、度过同一段时间——这就是「在一起」吗？", en: "What does 'being together' mean? Two people in the same space, passing the same time — is that all it is?", src: "—— 共在（Mitsein）的现象学", enSrc: "— Phenomenology of Mitsein (being-with)" },
+  { q: "如果你爱一个人，你应该希望他们成为最好的自己——即使那个「最好的自己」不包括你吗？", en: "If you love someone, should you want them to become their best self — even if that best self doesn't include you?", src: "—— 爱的伦理与自我牺牲", enSrc: "— Ethics of love & self-sacrifice" },
+  { q: "人与人之间的「连接」是什么？它是一种实际存在的东西，还是一个我们共同制造的幻觉？", en: "What is 'connection' between people? Is it something that actually exists, or a shared illusion we create together?", src: "—— 连接的本体论", enSrc: "— Ontology of connection" },
 
-  // ── 痛苦与幸福 ──
-  { q: "痛苦有意义吗？如果有，这个意义是它自身具有的，还是我们赋予的？", src: "—— 苦难的意义与尼采的「amor fati」" },
-  { q: "幸福是什么？是你得到你想要的，还是你想要你已经得到的？", src: "—— 欲望与满足的辩证法" },
-  { q: "如果你能消除世界上所有的痛苦——你会吗？一个没有痛苦的世界是什么样的？", src: "—— 痛苦的必要性" },
-  { q: "你不快乐是因为生活不够好，还是因为你期待的太多？", src: "—— 斯多亚主义与欲望管理" },
-  { q: "快乐和意义——如果只能选一个，你选哪个？", src: "—— 快乐主义 vs 意义导向" },
-  { q: "承受痛苦的能力是否比感受快乐的能力更值得尊敬？", src: "—— 苦难的伦理地位" },
+  // ── 痛苦与幸福 / Suffering & Happiness ──
+  { q: "痛苦有意义吗？如果有，这个意义是它自身具有的，还是我们赋予的？", en: "Does suffering have meaning? If so, does that meaning belong to suffering itself, or do we bestow it?", src: "—— 苦难的意义与尼采的「amor fati」", enSrc: "— The meaning of suffering & Nietzsche's 'amor fati'" },
+  { q: "幸福是什么？是你得到你想要的，还是你想要你已经得到的？", en: "What is happiness? Getting what you want, or wanting what you already have?", src: "—— 欲望与满足的辩证法", enSrc: "— Dialectic of desire & satisfaction" },
+  { q: "如果你能消除世界上所有的痛苦——你会吗？一个没有痛苦的世界是什么样的？", en: "If you could eliminate all suffering in the world — would you? What would a world without pain look like?", src: "—— 痛苦的必要性", enSrc: "— The necessity of suffering" },
+  { q: "你不快乐是因为生活不够好，还是因为你期待的太多？", en: "Are you unhappy because life isn't good enough, or because you expect too much?", src: "—— 斯多亚主义与欲望管理", enSrc: "— Stoicism & desire management" },
+  { q: "快乐和意义——如果只能选一个，你选哪个？", en: "Happiness or meaning — if you could only choose one, which would it be?", src: "—— 快乐主义 vs 意义导向", enSrc: "— Hedonism vs. meaning-orientation" },
+  { q: "承受痛苦的能力是否比感受快乐的能力更值得尊敬？", en: "Is the capacity to endure suffering more admirable than the capacity to feel joy?", src: "—— 苦难的伦理地位", enSrc: "— The ethical status of suffering" },
 
-  // ── 美与感知 ──
-  { q: "你上一次真正「看见」一棵树是什么时候？不是认出它是一棵树，而是看见它本身。", src: "—— 现象学：回到事物本身" },
-  { q: "美是事物自身的属性，还是观看者内心的投射？", src: "—— 美学的基本问题" },
-  { q: "丑的东西可以美吗？破碎的、残缺的、衰败的——有没有一种美藏在里面？", src: "—— 否定美学与侘寂" },
-  { q: "为什么有些音乐让你想哭？声音只是空气振动——情感从哪里来？", src: "—— 音乐哲学与情感" },
-  { q: "如果你从未见过「美」这个概念——你还能感受到美吗？", src: "—— 美的先天性与文化建构" },
-  { q: "宇宙是美的吗？如果是，这种美是为谁而存在的？", src: "—— 宇宙美学与目的论" },
-  { q: "日落为什么感人？是因为它美，还是因为它短暂？", src: "—— 时间性与审美体验" },
+  // ── 美与感知 / Beauty & Perception ──
+  { q: "你上一次真正「看见」一棵树是什么时候？不是认出它是一棵树，而是看见它本身。", en: "When was the last time you truly saw a tree? Not recognized it as a tree, but actually saw it.", src: "—— 现象学：回到事物本身", enSrc: "— Phenomenology: return to the things themselves" },
+  { q: "美是事物自身的属性，还是观看者内心的投射？", en: "Is beauty a property of the object itself, or a projection of the viewer's mind?", src: "—— 美学的基本问题", enSrc: "— The fundamental question of aesthetics" },
+  { q: "丑的东西可以美吗？破碎的、残缺的、衰败的——有没有一种美藏在里面？", en: "Can something ugly be beautiful? The broken, the incomplete, the decaying — is there a beauty hidden inside?", src: "—— 否定美学与侘寂", enSrc: "— Negative aesthetics & wabi-sabi" },
+  { q: "为什么有些音乐让你想哭？声音只是空气振动——情感从哪里来？", en: "Why does certain music make you want to cry? Sound is just air vibrating — where does the emotion come from?", src: "—— 音乐哲学与情感", enSrc: "— Philosophy of music & emotion" },
+  { q: "如果你从未见过「美」这个概念——你还能感受到美吗？", en: "If you had never encountered the concept of 'beauty' — could you still feel it?", src: "—— 美的先天性与文化建构", enSrc: "— Innate beauty vs. cultural construction" },
+  { q: "宇宙是美的吗？如果是，这种美是为谁而存在的？", en: "Is the universe beautiful? If so, who is that beauty for?", src: "—— 宇宙美学与目的论", enSrc: "— Cosmic aesthetics & teleology" },
+  { q: "日落为什么感人？是因为它美，还是因为它短暂？", en: "Why does a sunset move us? Because it is beautiful, or because it is fleeting?", src: "—— 时间性与审美体验", enSrc: "— Temporality & aesthetic experience" },
 
-  // ── 知识与真实 ──
-  { q: "你怎么知道你此刻不是在做梦？不是在一个模拟器中？", src: "—— 笛卡尔的怀疑与模拟假说" },
-  { q: "「知道」一件事意味着什么？是你能背出来，还是你能感觉到，还是你能用出来？", src: "—— 知识的定义与葛梯尔问题" },
-  { q: "真理存在吗？如果存在，它是被发现的，还是被发明的？", src: "—— 真理符合论 vs 建构论" },
-  { q: "科学和艺术——谁更接近真实？还是它们面对的是不同的真实？", src: "—— 两种知识的分界" },
-  { q: "你相信的东西是你选择的，还是你被说服的？相信和知道有什么不同？", src: "—— 信念伦理学" },
-  { q: "如果全世界都相信一件事——这件事就变成真的了吗？", src: "—— 真理与社会建构" },
-  { q: "有些东西你必须先相信，才能理解——这是知识的起点还是信仰的陷阱？", src: "—— 安瑟伦 vs 证据主义" },
-  { q: "无知是不是一种选择？在某些时候，知道更多是否反而更痛苦？", src: "—— 无知的权利与知识伦理" },
+  // ── 知识与真实 / Knowledge & Truth ──
+  { q: "你怎么知道你此刻不是在做梦？不是在一个模拟器中？", en: "How do you know you're not dreaming right now? Or living in a simulation?", src: "—— 笛卡尔的怀疑与模拟假说", enSrc: "— Cartesian doubt & the simulation hypothesis" },
+  { q: "「知道」一件事意味着什么？是你能背出来，还是你能感觉到，还是你能用出来？", en: "What does it mean to 'know' something? That you can recite it, feel it, or apply it?", src: "—— 知识的定义与葛梯尔问题", enSrc: "— Definition of knowledge & the Gettier problem" },
+  { q: "真理存在吗？如果存在，它是被发现的，还是被发明的？", en: "Does truth exist? If so, is it discovered or invented?", src: "—— 真理符合论 vs 建构论", enSrc: "— Correspondence theory vs. constructivism" },
+  { q: "科学和艺术——谁更接近真实？还是它们面对的是不同的真实？", en: "Science and art — which gets closer to truth? Or are they approaching different kinds of truth?", src: "—— 两种知识的分界", enSrc: "— Two kinds of knowledge" },
+  { q: "你相信的东西是你选择的，还是你被说服的？相信和知道有什么不同？", en: "Do you choose what you believe, or are you persuaded? What's the difference between belief and knowledge?", src: "—— 信念伦理学", enSrc: "— Ethics of belief" },
+  { q: "如果全世界都相信一件事——这件事就变成真的了吗？", en: "If everyone in the world believed something — would it become true?", src: "—— 真理与社会建构", enSrc: "— Truth & social construction" },
+  { q: "有些东西你必须先相信，才能理解——这是知识的起点还是信仰的陷阱？", en: "Some things you must first believe in order to understand — is that the starting point of knowledge or the trap of faith?", src: "—— 安瑟伦 vs 证据主义", enSrc: "— Anselm vs. evidentialism" },
+  { q: "无知是不是一种选择？在某些时候，知道更多是否反而更痛苦？", en: "Is ignorance a choice? Are there times when knowing more only brings more pain?", src: "—— 无知的权利与知识伦理", enSrc: "— The right to ignorance & ethics of knowledge" },
 
-  // ── 伦理与正义 ──
-  { q: "如果一个行为出于善意却导致了灾难——它是善的还是恶的？道德评判应该看动机还是看结果？", src: "—— 义务论 vs 后果论" },
-  { q: "你是否对陌生人负有责任？如果是，这种责任从哪里来？如果不是，为什么？", src: "—— 普世伦理与道德圈" },
-  { q: "如果可以牺牲一个人来救五个人——你会按那个按钮吗？", src: "—— 电车难题与道德直觉" },
-  { q: "宽恕是什么？是忘记、是放下、还是一种更高的力量？", src: "—— 宽恕的哲学" },
-  { q: "你是一个好人吗？你用什么标准来判断？", src: "—— 道德自我评价" },
+  // ── 伦理与正义 / Ethics & Justice ──
+  { q: "如果一个行为出于善意却导致了灾难——它是善的还是恶的？道德评判应该看动机还是看结果？", en: "If an action born of good intentions leads to disaster — is it good or evil? Should morality judge by motive or by outcome?", src: "—— 义务论 vs 后果论", enSrc: "— Deontology vs. consequentialism" },
+  { q: "你是否对陌生人负有责任？如果是，这种责任从哪里来？如果不是，为什么？", en: "Do you have a responsibility toward strangers? If so, where does that responsibility come from?", src: "—— 普世伦理与道德圈", enSrc: "— Universal ethics & the moral circle" },
+  { q: "如果可以牺牲一个人来救五个人——你会按那个按钮吗？", en: "If you could sacrifice one person to save five — would you press the button?", src: "—— 电车难题与道德直觉", enSrc: "— The trolley problem & moral intuition" },
+  { q: "宽恕是什么？是忘记、是放下、还是一种更高的力量？", en: "What is forgiveness? Is it forgetting, letting go, or something more powerful?", src: "—— 宽恕的哲学", enSrc: "— Philosophy of forgiveness" },
+  { q: "你是一个好人吗？你用什么标准来判断？", en: "Are you a good person? By what standard do you judge?", src: "—— 道德自我评价", enSrc: "— Moral self-evaluation" },
 
-  // ── 中国哲学 ──
-  { q: "「无为」不是什么都不做——那它到底是什么？你在生活中体验过「无为」吗？", src: "—— 老子与无为之道" },
-  { q: "「庄周梦蝶」——如果人生是一场大梦，你愿意醒来吗？", src: "—— 庄子与存在的虚幻性" },
-  { q: "水是最柔软的，却能穿石。你生命中有没有「柔软胜刚强」的体验？", src: "—— 老子与柔弱哲学" },
-  { q: "「仁」是什么？是爱别人，是同理心，还是别的什么？", src: "—— 孔子与仁的伦理" },
-  { q: "「心外无物」——如果你没有看见一朵花，那朵花还存在吗？", src: "—— 王阳明与心学" },
-  { q: "「道可道，非常道」——最真的东西是不是永远说不出来？那些说出来的，是不是已经偏离了真实？", src: "—— 老子与语言的局限" },
-  { q: "「吾丧我」是什么意思？失去了「我」，剩下的是什么？", src: "—— 庄子与自我的消解" },
-  { q: "有用和无用——大树因为「无用」而活千年，你觉得自己「有用」吗？谁定义的「有用」？", src: "—— 庄子与效用批判" },
-  { q: "「天人合一」是一种感受还是一个事实？你体验过和自然「合一」的瞬间吗？", src: "—— 中国哲学中的天人关系" },
+  // ── 中国哲学 / Chinese Philosophy ──
+  { q: "「无为」不是什么都不做——那它到底是什么？你在生活中体验过「无为」吗？", en: "'Wu wei' doesn't mean doing nothing — so what does it mean? Have you ever experienced it in your own life?", src: "—— 老子与无为之道", enSrc: "— Laozi & the way of wu wei" },
+  { q: "「庄周梦蝶」——如果人生是一场大梦，你愿意醒来吗？", en: "'Zhuangzi dreamed he was a butterfly' — if life is but a dream, would you want to wake up?", src: "—— 庄子与存在的虚幻性", enSrc: "— Zhuangzi & the illusory nature of existence" },
+  { q: "水是最柔软的，却能穿石。你生命中有没有「柔软胜刚强」的体验？", en: "Water is the softest thing, yet it wears away stone. Have you seen 'softness overcoming hardness' in your own life?", src: "—— 老子与柔弱哲学", enSrc: "— Laozi & the philosophy of softness" },
+  { q: "「仁」是什么？是爱别人，是同理心，还是别的什么？", en: "What is 'ren'? Is it love for others, empathy, or something else entirely?", src: "—— 孔子与仁的伦理", enSrc: "— Confucius & the ethics of ren" },
+  { q: "「心外无物」——如果你没有看见一朵花，那朵花还存在吗？", en: "'There is nothing outside the mind' — if you never saw a flower, would that flower still exist?", src: "—— 王阳明与心学", enSrc: "— Wang Yangming & the School of Mind" },
+  { q: "「道可道，非常道」——最真的东西是不是永远说不出来？那些说出来的，是不是已经偏离了真实？", en: "'The Dao that can be spoken is not the eternal Dao' — is the truest thing always unsayable? Does speaking it already distort it?", src: "—— 老子与语言的局限", enSrc: "— Laozi & the limits of language" },
+  { q: "「吾丧我」是什么意思？失去了「我」，剩下的是什么？", en: "What does 'I have lost myself' mean? When you lose the 'I,' what remains?", src: "—— 庄子与自我的消解", enSrc: "— Zhuangzi & the dissolution of self" },
+  { q: "有用和无用——大树因为「无用」而活千年，你觉得自己「有用」吗？谁定义的「有用」？", en: "The useful and the useless — a great tree lives a thousand years because it is 'useless.' Do you consider yourself useful? Who defines what useful means?", src: "—— 庄子与效用批判", enSrc: "— Zhuangzi & the critique of utility" },
+  { q: "「天人合一」是一种感受还是一个事实？你体验过和自然「合一」的瞬间吗？", en: "Is 'the unity of heaven and humanity' a feeling or a fact? Have you ever experienced a moment of oneness with nature?", src: "—— 中国哲学中的天人关系", enSrc: "— The heaven-human relationship in Chinese philosophy" },
 
-  // ── 技术与现代 ──
-  { q: "手机是你的延伸，还是你的替代品？当它扩展你的同时，是否也截断了什么？", src: "—— 麦克卢汉与技术哲学" },
-  { q: "社交网络上的「你」和真实的你——谁更真实？还是各有各的真实？", src: "—— 数字身份与真实性" },
-  { q: "算法比你更了解你的欲望——那你还是你欲望的主人吗？", src: "—— 算法治理与自主性" },
-  { q: "技术进步让我们更自由了吗？还是我们只是换了一种方式被束缚？", src: "—— 技术决定论 vs 技术工具论" },
-  { q: "如果 AI 能写诗、画画、作曲——艺术还是艺术吗？还是艺术必须来自人的灵魂？", src: "—— AI 与创造力的哲学" },
+  // ── 技术与现代 / Technology & Modernity ──
+  { q: "手机是你的延伸，还是你的替代品？当它扩展你的同时，是否也截断了什么？", en: "Is your phone an extension of you, or a replacement? As it expands your reach, does it also sever something?", src: "—— 麦克卢汉与技术哲学", enSrc: "— McLuhan & philosophy of technology" },
+  { q: "社交网络上的「你」和真实的你——谁更真实？还是各有各的真实？", en: "The 'you' on social media and the real you — which is more real? Or does each have its own kind of reality?", src: "—— 数字身份与真实性", enSrc: "— Digital identity & authenticity" },
+  { q: "算法比你更了解你的欲望——那你还是你欲望的主人吗？", en: "Algorithms know your desires better than you do — so are you still the master of your own desires?", src: "—— 算法治理与自主性", enSrc: "— Algorithmic governance & autonomy" },
+  { q: "技术进步让我们更自由了吗？还是我们只是换了一种方式被束缚？", en: "Has technology made us freer? Or have we simply traded one form of bondage for another?", src: "—— 技术决定论 vs 技术工具论", enSrc: "— Technological determinism vs. instrumentalism" },
+  { q: "如果 AI 能写诗、画画、作曲——艺术还是艺术吗？还是艺术必须来自人的灵魂？", en: "If AI can write poetry, paint, and compose music — is it still art? Or must art come from a human soul?", src: "—— AI 与创造力的哲学", enSrc: "— AI & the philosophy of creativity" },
 
-  // ── 日常中的哲学 ──
-  { q: "你上一次感到「惊奇」是什么时候？惊奇和好奇有什么不同？", src: "—— 哲学始于惊奇（亚里士多德）" },
-  { q: "等待是什么？你是在等待某个东西，还是在等待中度过了你的生命？", src: "—— 等待的现象学" },
-  { q: "「家」是什么？是一个地方、一种感觉、还是某些人的存在？", src: "—— 海德格尔的「栖居」" },
-  { q: "仪式感为什么重要？重复的动作和话语，如何承载意义？", src: "—— 日常仪式与意义建构" },
-  { q: "游戏和工作有什么区别？如果工作让你快乐，它是不是就成了游戏？", src: "—— 游戏哲学与劳动意义" },
-  { q: "「无聊」是什么？它是不是一种信号——提醒你某些东西缺失了？", src: "—— 无聊的存在主义解读" },
-  { q: "散步的时候，你的思绪去了哪里？身体在走，灵魂也在走吗？", src: "—— 行走与思考的现象学" },
-  { q: "为什么告别总是沉重的？再见的那一刻，到底在告别什么？", src: "—— 告别与时间的体验" },
-  { q: "「日常」是最难被看见的东西——为什么最重要的事物反而最容易被忽略？", src: "—— 海德格尔与上手状态" },
+  // ── 日常中的哲学 / Philosophy in Everyday Life ──
+  { q: "你上一次感到「惊奇」是什么时候？惊奇和好奇有什么不同？", en: "When was the last time you felt wonder? And how is wonder different from curiosity?", src: "—— 哲学始于惊奇（亚里士多德）", enSrc: "— Philosophy begins in wonder (Aristotle)" },
+  { q: "等待是什么？你是在等待某个东西，还是在等待中度过了你的生命？", en: "What is waiting? Are you waiting for something, or are you spending your life in waiting?", src: "—— 等待的现象学", enSrc: "— Phenomenology of waiting" },
+  { q: "「家」是什么？是一个地方、一种感觉、还是某些人的存在？", en: "What is 'home'? A place, a feeling, or the presence of certain people?", src: "—— 海德格尔的「栖居」", enSrc: "— Heidegger's 'dwelling'" },
+  { q: "仪式感为什么重要？重复的动作和话语，如何承载意义？", en: "Why does ritual matter? How do repeated actions and words carry meaning?", src: "—— 日常仪式与意义建构", enSrc: "— Everyday ritual & meaning-making" },
+  { q: "游戏和工作有什么区别？如果工作让你快乐，它是不是就成了游戏？", en: "What's the difference between play and work? If work makes you happy, does it become play?", src: "—— 游戏哲学与劳动意义", enSrc: "— Philosophy of play & the meaning of labor" },
+  { q: "「无聊」是什么？它是不是一种信号——提醒你某些东西缺失了？", en: "What is boredom? Is it a signal — reminding you that something is missing?", src: "—— 无聊的存在主义解读", enSrc: "— An existentialist reading of boredom" },
+  { q: "散步的时候，你的思绪去了哪里？身体在走，灵魂也在走吗？", en: "When you take a walk, where does your mind go? Your body is walking — is your soul walking too?", src: "—— 行走与思考的现象学", enSrc: "— Phenomenology of walking & thinking" },
+  { q: "为什么告别总是沉重的？再见的那一刻，到底在告别什么？", en: "Why are goodbyes always heavy? In the moment of farewell, what exactly are we parting from?", src: "—— 告别与时间的体验", enSrc: "— Farewell & the experience of time" },
+  { q: "「日常」是最难被看见的东西——为什么最重要的事物反而最容易被忽略？", en: "The everyday is the hardest thing to see — why are the most important things the easiest to overlook?", src: "—— 海德格尔与上手状态", enSrc: "— Heidegger & readiness-to-hand" },
 
-  // ── 终极问题 ──
-  { q: "为什么有存在，而不是什么都没有？", src: "—— 莱布尼茨与海德格尔的终极之问" },
-  { q: "宇宙有目的吗？如果有，是谁或什么赋予的？如果没有，那我们为什么要做任何事？", src: "—— 目的论与宇宙意义" },
-  { q: "如果宇宙是一个巨大的巧合——这个巧合本身，算不算一种奇迹？", src: "—— 偶然性与惊奇" },
-  { q: "神存在吗？如果不存在，为什么几乎每个文明都发明了神？如果存在，为什么有那么多不同的神？", src: "—— 宗教哲学的基本张力" },
-  { q: "第一个生命是怎么从非生命中诞生的？那个「活过来」的瞬间，发生了什么？", src: "—— 生命起源与活力论" },
+  // ── 终极问题 / Ultimate Questions ──
+  { q: "为什么有存在，而不是什么都没有？", en: "Why is there something rather than nothing?", src: "—— 莱布尼茨与海德格尔的终极之问", enSrc: "— Leibniz & Heidegger's ultimate question" },
+  { q: "宇宙有目的吗？如果有，是谁或什么赋予的？如果没有，那我们为什么要做任何事？", en: "Does the universe have a purpose? If so, who or what gave it one? If not, why do anything at all?", src: "—— 目的论与宇宙意义", enSrc: "— Teleology & cosmic meaning" },
+  { q: "如果宇宙是一个巨大的巧合——这个巧合本身，算不算一种奇迹？", en: "If the universe is one vast coincidence — isn't that coincidence itself a kind of miracle?", src: "—— 偶然性与惊奇", enSrc: "— Contingency & wonder" },
+  { q: "神存在吗？如果不存在，为什么几乎每个文明都发明了神？如果存在，为什么有那么多不同的神？", en: "Does God exist? If not, why has nearly every civilization invented gods? If so, why are there so many different ones?", src: "—— 宗教哲学的基本张力", enSrc: "— The fundamental tension of philosophy of religion" },
+  { q: "第一个生命是怎么从非生命中诞生的？那个「活过来」的瞬间，发生了什么？", en: "How did the first life emerge from non-life? In that moment of 'coming alive' — what happened?", src: "—— 生命起源与活力论", enSrc: "— Origin of life & vitalism" },
 
-  // ── 更多问题（扩充中）──
-  { q: "你能真正「原谅」一个人吗？原谅意味着什么——忘记伤害、还是超越伤害？", src: "—— 宽恕哲学的深度" },
-  { q: "孤独和独处是一回事吗？一个人可以在人群中感到孤独吗？", src: "—— 孤独的现象学区分" },
-  { q: "你的「性格」是你选择的结果还是环境塑造的产物？如果是后者，你该为自己的行为负责吗？", src: "—— 性格与道德责任" },
-  { q: "「成长」意味着什么？是你变得更好了，还是你变得更能适应了？", src: "—— 成长哲学的批判" },
-  { q: "遗忘是一种缺陷还是一种能力？如果什么都忘不掉，生活还能继续吗？", src: "—— 遗忘的哲学与博尔赫斯" },
-  { q: "「正常」是谁定义的？偏离「正常」是自由还是危险？", src: "—— 福柯与正常化的权力" },
-  { q: "欲望满足之后的那一瞬间——你感受到的是什么？是满足，还是空虚？", src: "—— 欲望结构与享乐悖论" },
-  { q: "羡慕和嫉妒的区别是什么？哪一个更接近「爱」？", src: "—— 情感现象学" },
-  { q: "如果你是另一个人，你会和现在的你成为朋友吗？", src: "—— 自我认知的视角转换" },
-  { q: "时间是线性的吗？还是我们在回忆和期待中，不断地重新编织它？", src: "—— 叙事时间与线性时间" },
-  { q: "你是否曾经在音乐中「消失」？当一首曲子结束，你回到自己——那个「消失」的你去哪了？", src: "—— 音乐与自我消融体验" },
-  { q: "如果你把一个物体上的每一个原子都替换掉——它还是原来那个物体吗？你也是同理吗？", src: "—— 忒修斯之船与人格同一性" },
-  { q: "「直觉」是什么？它是未经思考的知识，还是思考之前的某种东西？", src: "—— 直觉的认识论" },
-  { q: "承诺的力量从哪来？说出一句话——「我答应你」——怎么就能约束未来的行为？", src: "—— 言语行为哲学与承诺" },
-  { q: "如果你知道你永远不会被抓住，你会做一些你平时不做的事吗？那这些事反映了你的「真实自我」吗？", src: "—— 道德与隐秘自我" },
-  { q: "你能为自己不存在的想法负责吗？一个突然闯入脑海的恶念，是你的吗？", src: "—— 思想的所有权与道德责任" },
-  { q: "什么都不做，做白日梦——这是浪费时间，还是生命中最重要的事？", src: "—— 闲散的哲学辩护" },
-  { q: "你的身体在变老，但你的「内心」似乎停留在了某个年龄——那个年龄是几岁？", src: "—— 主观年龄与时间体验" },
-  { q: "「命运」这个词——是解释过去的修辞，还是指引未来的力量？", src: "—— 命运概念的解构" },
-  { q: "如果你不能和任何人交流——你的思想还能存在吗？它们还是思想吗？", src: "—— 孤独心灵中的语言与思维" },
-  { q: "你在镜子中看到的那个人，是你，还是你的「反面」？左边和右边互换了，他还是你吗？", src: "—— 镜像自我与身体图式" },
-  { q: "什么是「经验」？做同一件事一百次，你获得的是经验还是习惯？经验和习惯有什么区别？", src: "—— 经验的哲学分析" },
-  { q: "「天赋」真的存在吗？如果有，拥有天赋的人应该因此得到更多吗？", src: "—— 天赋与分配正义" },
-  { q: "一个人可以同时是善的又是恶的吗？还是善恶是不同层面的东西？", src: "—— 道德复杂性" },
-  { q: "思想的速度有多快？你能控制自己思考的速度吗？", src: "—— 思维速度的现象学" },
-  { q: "「安静」是一种声音吗？如果你在一个绝对安静的空间里，你听到的是什么？", src: "—— 寂静的感知哲学" },
-  { q: "幽默是什么？为什么有些东西「好笑」？笑的时候，你在笑什么？", src: "—— 幽默哲学与笑的本质" },
-  { q: "「足够」是多少？什么时候你拥有的东西「够了」？", src: "—— 满足的哲学与欲望的终结" },
-  { q: "意外发生的时候——比如打翻一杯水——那一刻你的反应，暴露了你的什么？", src: "—— 微小事件中的自我揭示" },
-  { q: "什么是「成熟」？是变得更理性，还是变得更能接受自己非理性的一面？", src: "—— 成熟概念的批判" },
-  { q: "你和童年的你——如果见面了，你们会认出对方吗？", src: "—— 童年自我与成年自我的连续性" },
+  // ── 更多问题 / More Questions ──
+  { q: "你能真正「原谅」一个人吗？原谅意味着什么——忘记伤害、还是超越伤害？", en: "Can you truly forgive someone? What does forgiveness mean — forgetting the harm, or transcending it?", src: "—— 宽恕哲学的深度", enSrc: "— Depth of the philosophy of forgiveness" },
+  { q: "孤独和独处是一回事吗？一个人可以在人群中感到孤独吗？", en: "Are loneliness and solitude the same thing? Can a person feel lonely in a crowd?", src: "—— 孤独的现象学区分", enSrc: "— Phenomenological distinction of loneliness" },
+  { q: "你的「性格」是你选择的结果还是环境塑造的产物？如果是后者，你该为自己的行为负责吗？", en: "Is your personality the result of your choices, or the product of your environment? If the latter, are you still responsible for your actions?", src: "—— 性格与道德责任", enSrc: "— Character & moral responsibility" },
+  { q: "「成长」意味着什么？是你变得更好了，还是你变得更能适应了？", en: "What does 'growth' mean? Becoming a better person, or becoming better at adapting?", src: "—— 成长哲学的批判", enSrc: "— Critique of growth philosophy" },
+  { q: "遗忘是一种缺陷还是一种能力？如果什么都忘不掉，生活还能继续吗？", en: "Is forgetting a flaw or a capability? If you could forget nothing, could life go on?", src: "—— 遗忘的哲学与博尔赫斯", enSrc: "— Philosophy of forgetting & Borges" },
+  { q: "「正常」是谁定义的？偏离「正常」是自由还是危险？", en: "Who defines 'normal'? Is deviating from the norm freedom or danger?", src: "—— 福柯与正常化的权力", enSrc: "— Foucault & the power of normalization" },
+  { q: "欲望满足之后的那一瞬间——你感受到的是什么？是满足，还是空虚？", en: "In the moment right after a desire is fulfilled — what do you feel? Satisfaction, or emptiness?", src: "—— 欲望结构与享乐悖论", enSrc: "— Structure of desire & the pleasure paradox" },
+  { q: "羡慕和嫉妒的区别是什么？哪一个更接近「爱」？", en: "What's the difference between admiration and envy? Which one is closer to love?", src: "—— 情感现象学", enSrc: "— Phenomenology of emotions" },
+  { q: "如果你是另一个人，你会和现在的你成为朋友吗？", en: "If you were someone else, would you be friends with the person you are now?", src: "—— 自我认知的视角转换", enSrc: "— Perspective shift in self-knowledge" },
+  { q: "时间是线性的吗？还是我们在回忆和期待中，不断地重新编织它？", en: "Is time linear? Or do we constantly reweave it through memory and anticipation?", src: "—— 叙事时间与线性时间", enSrc: "— Narrative time & linear time" },
+  { q: "你是否曾经在音乐中「消失」？当一首曲子结束，你回到自己——那个「消失」的你去哪了？", en: "Have you ever 'disappeared' into music? When the piece ends and you return to yourself — where did the you that vanished go?", src: "—— 音乐与自我消融体验", enSrc: "— Music & ego dissolution" },
+  { q: "如果你把一个物体上的每一个原子都替换掉——它还是原来那个物体吗？你也是同理吗？", en: "If you replaced every atom of an object — is it still the same object? And by the same logic, are you still you?", src: "—— 忒修斯之船与人格同一性", enSrc: "— Ship of Theseus & personal identity" },
+  { q: "「直觉」是什么？它是未经思考的知识，还是思考之前的某种东西？", en: "What is intuition? Knowledge without thinking, or something that precedes thought?", src: "—— 直觉的认识论", enSrc: "— Epistemology of intuition" },
+  { q: "承诺的力量从哪来？说出一句话——「我答应你」——怎么就能约束未来的行为？", en: "Where does the power of a promise come from? How do a few words — 'I promise' — bind future actions?", src: "—— 言语行为哲学与承诺", enSrc: "— Speech act philosophy & promises" },
+  { q: "如果你知道你永远不会被抓住，你会做一些你平时不做的事吗？那这些事反映了你的「真实自我」吗？", en: "If you knew you'd never be caught, would you do things you normally wouldn't? Would those acts reveal your 'true self'?", src: "—— 道德与隐秘自我", enSrc: "— Morality & the hidden self" },
+  { q: "你能为自己不存在的想法负责吗？一个突然闯入脑海的恶念，是你的吗？", en: "Can you be responsible for a thought you didn't choose to have? A dark impulse that flashes into your mind — is it yours?", src: "—— 思想的所有权与道德责任", enSrc: "— Ownership of thoughts & moral responsibility" },
+  { q: "什么都不做，做白日梦——这是浪费时间，还是生命中最重要的事？", en: "Doing nothing, daydreaming — is it a waste of time, or the most important thing in life?", src: "—— 闲散的哲学辩护", enSrc: "— In defense of idleness" },
+  { q: "你的身体在变老，但你的「内心」似乎停留在了某个年龄——那个年龄是几岁？", en: "Your body ages, but your 'inner self' seems to have stopped at a certain age — how old is that age?", src: "—— 主观年龄与时间体验", enSrc: "— Subjective age & temporal experience" },
+  { q: "「命运」这个词——是解释过去的修辞，还是指引未来的力量？", en: "The word 'fate' — is it a rhetorical device for explaining the past, or a force that guides the future?", src: "—— 命运概念的解构", enSrc: "— Deconstructing fate" },
+  { q: "如果你不能和任何人交流——你的思想还能存在吗？它们还是思想吗？", en: "If you could never communicate with anyone — would your thoughts still exist? Would they still be thoughts?", src: "—— 孤独心灵中的语言与思维", enSrc: "— Language & thought in a solitary mind" },
+  { q: "你在镜子中看到的那个人，是你，还是你的「反面」？左边和右边互换了，他还是你吗？", en: "The person you see in the mirror — is that you, or your 'reverse'? Left and right are swapped — is it still you?", src: "—— 镜像自我与身体图式", enSrc: "— Mirror self & body schema" },
+  { q: "什么是「经验」？做同一件事一百次，你获得的是经验还是习惯？经验和习惯有什么区别？", en: "What is 'experience'? Do something a hundred times — do you gain experience or habit? What's the difference?", src: "—— 经验的哲学分析", enSrc: "— Philosophical analysis of experience" },
+  { q: "「天赋」真的存在吗？如果有，拥有天赋的人应该因此得到更多吗？", en: "Does 'talent' really exist? If so, should those who have it get more because of it?", src: "—— 天赋与分配正义", enSrc: "— Talent & distributive justice" },
+  { q: "一个人可以同时是善的又是恶的吗？还是善恶是不同层面的东西？", en: "Can a person be both good and evil at the same time? Or do good and evil exist on different planes?", src: "—— 道德复杂性", enSrc: "— Moral complexity" },
+  { q: "思想的速度有多快？你能控制自己思考的速度吗？", en: "How fast does thought travel? Can you control the speed of your own thinking?", src: "—— 思维速度的现象学", enSrc: "— Phenomenology of thought speed" },
+  { q: "「安静」是一种声音吗？如果你在一个绝对安静的空间里，你听到的是什么？", en: "Is silence a sound? If you were in a perfectly silent space, what would you hear?", src: "—— 寂静的感知哲学", enSrc: "— Philosophy of silence perception" },
+  { q: "幽默是什么？为什么有些东西「好笑」？笑的时候，你在笑什么？", en: "What is humor? Why is something 'funny'? When you laugh, what are you really laughing at?", src: "—— 幽默哲学与笑的本质", enSrc: "— Philosophy of humor & the nature of laughter" },
+  { q: "「足够」是多少？什么时候你拥有的东西「够了」？", en: "How much is 'enough'? When do you have 'enough' of something?", src: "—— 满足的哲学与欲望的终结", enSrc: "— Philosophy of sufficiency & the end of desire" },
+  { q: "意外发生的时候——比如打翻一杯水——那一刻你的反应，暴露了你的什么？", en: "When something unexpected happens — like knocking over a glass of water — what does your reaction in that instant reveal about you?", src: "—— 微小事件中的自我揭示", enSrc: "— Self-revelation in small moments" },
+  { q: "什么是「成熟」？是变得更理性，还是变得更能接受自己非理性的一面？", en: "What is 'maturity'? Becoming more rational, or becoming more accepting of your irrational side?", src: "—— 成熟概念的批判", enSrc: "— Critique of maturity" },
+  { q: "你和童年的你——如果见面了，你们会认出对方吗？", en: "You and your childhood self — if you met, would you recognize each other?", src: "—— 童年自我与成年自我的连续性", enSrc: "— Continuity between childhood & adult self" },
 
-  // ── 更多冲击力的问题 ──
-  { q: "「我不知道」——这是不是你最诚实的一句话？", src: "—— 苏格拉底与知无知" },
-  { q: "此刻你呼吸的空气——它曾经穿过多少人的肺？这个想法让你感到连接还是恐惧？", src: "—— 物质循环与存在连接" },
-  { q: "你有多少想法是你自己的？有多少是你从别人那里借来、却以为是自己的？", src: "—— 思想的所有权" },
-  { q: "当你生气的时候——是「你」在生气，还是某个比「你」更古老的东西借你的身体在生气？", src: "—— 情绪的自我与非自我" },
-  { q: "你生命中最重要的决定——它们是在清醒的状态下做的，还是在某种恍惚中？", src: "—— 重大决策的现象学" },
-  { q: "如果把你一生的所有瞬间拍成一部电影——你会看吗？你会快进哪些部分？", src: "—— 生命全景回顾" },
-  { q: "什么是「准备好了」？有没有什么事是你永远也「没有准备好」的？", src: "—— 准备与行动之间" },
-  { q: "「最后一次」——当你意识到这是最后一次做某件事的时候，那种感觉叫什么？", src: "—— 终末体验的现象学" },
-  { q: "你是否有过「被看见」的体验？不是被眼睛看见，而是被另一个灵魂认出了你。", src: "—— 承认与主体间性" },
-  { q: "你能听见你自己思考的声音吗？那个声音是谁的？", src: "—— 内在言语与自我" },
-  { q: "「当下」这个瞬间——在你意识到它的那一刻，它已经过去了。所以你永远追不上「当下」吗？", src: "—— 现在的悖论" },
-  { q: "你是因为快乐才笑，还是因为笑了才快乐？情绪是原因还是结果？", src: "—— 情绪的身体理论" },
-  { q: "照片里的那个人是你吗？如果所有的照片都在撒谎——它们定格了流动的东西——那什么才是真相？", src: "—— 影像哲学与真实性" },
-  { q: "如果你换了一种语言生活——你的性格会改变吗？你的价值观呢？", src: "—— 语言相对论与自我" },
-  { q: "什么时候你觉得自己「不是一个东西」？不是物体，不是标签，不是任何可以定义的存在？", src: "—— 超越定义的存在体验" },
+  // ── 更多冲击力的问题 / Provocative Questions ──
+  { q: "「我不知道」——这是不是你最诚实的一句话？", en: "'I don't know' — is that the most honest thing you've ever said?", src: "—— 苏格拉底与知无知", enSrc: "— Socrates & knowing that you know nothing" },
+  { q: "此刻你呼吸的空气——它曾经穿过多少人的肺？这个想法让你感到连接还是恐惧？", en: "The air you're breathing right now — how many lungs has it passed through? Does that thought make you feel connected, or afraid?", src: "—— 物质循环与存在连接", enSrc: "— Material cycles & existential connection" },
+  { q: "你有多少想法是你自己的？有多少是你从别人那里借来、却以为是自己的？", en: "How many of your thoughts are truly your own? How many have you borrowed from others and mistaken for your own?", src: "—— 思想的所有权", enSrc: "— Ownership of thoughts" },
+  { q: "当你生气的时候——是「你」在生气，还是某个比「你」更古老的东西借你的身体在生气？", en: "When you get angry — is it 'you' who is angry, or something older than you, borrowing your body to express its rage?", src: "—— 情绪的自我与非自我", enSrc: "— Self & non-self in emotion" },
+  { q: "你生命中最重要的决定——它们是在清醒的状态下做的，还是在某种恍惚中？", en: "The most important decisions of your life — were they made in full clarity, or in some kind of trance?", src: "—— 重大决策的现象学", enSrc: "— Phenomenology of big decisions" },
+  { q: "如果把你一生的所有瞬间拍成一部电影——你会看吗？你会快进哪些部分？", en: "If every moment of your life were made into a film — would you watch it? Which parts would you fast-forward through?", src: "—— 生命全景回顾", enSrc: "— The panoramic review of a life" },
+  { q: "什么是「准备好了」？有没有什么事是你永远也「没有准备好」的？", en: "What does it mean to be 'ready'? Is there something you will never be ready for?", src: "—— 准备与行动之间", enSrc: "— Between preparation & action" },
+  { q: "「最后一次」——当你意识到这是最后一次做某件事的时候，那种感觉叫什么？", en: "'The last time' — when you realize it's the last time you'll ever do something, what is that feeling called?", src: "—— 终末体验的现象学", enSrc: "— Phenomenology of final experiences" },
+  { q: "你是否有过「被看见」的体验？不是被眼睛看见，而是被另一个灵魂认出了你。", en: "Have you ever felt truly 'seen'? Not by someone's eyes, but by another soul recognizing you.", src: "—— 承认与主体间性", enSrc: "— Recognition & intersubjectivity" },
+  { q: "你能听见你自己思考的声音吗？那个声音是谁的？", en: "Can you hear the voice of your own thinking? Whose voice is it?", src: "—— 内在言语与自我", enSrc: "— Inner speech & the self" },
+  { q: "「当下」这个瞬间——在你意识到它的那一刻，它已经过去了。所以你永远追不上「当下」吗？", en: "'The present moment' — by the time you become aware of it, it's already gone. So can you never catch up to the present?", src: "—— 现在的悖论", enSrc: "— The paradox of now" },
+  { q: "你是因为快乐才笑，还是因为笑了才快乐？情绪是原因还是结果？", en: "Do you laugh because you're happy, or are you happy because you laugh? Is emotion cause or effect?", src: "—— 情绪的身体理论", enSrc: "— Somatic theory of emotion" },
+  { q: "照片里的那个人是你吗？如果所有的照片都在撒谎——它们定格了流动的东西——那什么才是真相？", en: "Is that person in the photograph really you? If every photo lies — freezing what is fluid — then what is the truth?", src: "—— 影像哲学与真实性", enSrc: "— Philosophy of images & authenticity" },
+  { q: "如果你换了一种语言生活——你的性格会改变吗？你的价值观呢？", en: "If you lived your life in a different language — would your personality change? What about your values?", src: "—— 语言相对论与自我", enSrc: "— Linguistic relativity & the self" },
+  { q: "什么时候你觉得自己「不是一个东西」？不是物体，不是标签，不是任何可以定义的存在？", en: "When do you feel you are 'not a thing'? Not an object, not a label, not any definable entity?", src: "—— 超越定义的存在体验", enSrc: "— The experience of being beyond definition" },
 ];
 
 // ═══════════════════════════════════════
@@ -800,13 +990,17 @@ function pickRandomQuestion() {
 function displayQuestion(data) {
   if (!data) data = getDailyQuestion();
   currentQuestion = data;
-  document.getElementById('questionText').textContent = data.q;
-  document.getElementById('questionSource').textContent = data.src;
+  const isZh = L === 'zh';
+  document.getElementById('questionText').textContent = isZh ? data.q : (data.en || data.q);
+  document.getElementById('questionSource').textContent = isZh ? data.src : (data.enSrc || data.src);
   if (data.source === 'ai') {
-    document.getElementById('questionLabel').innerHTML = 'AI 之问 <span class="question-badge">实时生成</span>';
+    document.getElementById('questionLabel').innerHTML = (isZh ? 'AI 之问' : 'AI Question') + ' <span class="question-badge">' + (isZh ? '实时生成' : 'Live') + '</span>';
   } else {
-    document.getElementById('questionLabel').textContent = '今日之问';
+    document.getElementById('questionLabel').textContent = isZh ? '今日之问' : 'Today\'s Question';
   }
+  document.getElementById('btnRefresh').textContent = isZh ? '↻ 换一个问题' : '↻ New Question';
+  document.getElementById('btnAI').textContent = isZh ? '✦ AI 生成' : '✦ AI Generate';
+  document.getElementById('btnAI').nextElementSibling.textContent = isZh ? '✎ 回应这个问题' : '✎ Respond';
 }
 
 async function refreshQuestion() {
@@ -884,14 +1078,14 @@ async function checkAPIStatus() {
     if (data.ok) {
       apiOnline = true;
       const hasKey = data.has_api_key;
-      document.getElementById('apiStatus').textContent = hasKey ? 'AI 实时生成 · 已连接' : '服务器已连接 · 本地题库';
+      document.getElementById('apiStatus').textContent = hasKey ? t('status_online') : t('status_server');
       document.getElementById('apiStatus').className = 'api-status online';
       document.getElementById('btnAI').style.display = hasKey ? '' : '';
       return;
     }
   } catch(e) {}
   apiOnline = false;
-  document.getElementById('apiStatus').textContent = '本地题库 · 170+ 问题';
+  document.getElementById('apiStatus').textContent = t('status_local') + ' · 170+';
   document.getElementById('apiStatus').className = 'api-status offline';
   document.getElementById('btnAI').style.display = '';
 }
@@ -1204,7 +1398,7 @@ async function sendToClaude() {
   const prompt = currentPrompt || '';
   const btn = document.getElementById('btnSend');
   const origHTML = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span> 思考中…';
+  btn.innerHTML = '<span class="spinner"></span> ' + t('spinner_sending');
   btn.disabled = true;
 
   // ── 如果是继续已有线程，带上下文一起发送 ──
@@ -1214,9 +1408,9 @@ async function sendToClaude() {
     const entry = entries.find(e => e.id === editingId);
     if (entry && entry.thread && entry.thread.length > 0) {
       const context = entry.thread.map(m =>
-        (m.role === 'user' ? '我：' : 'Claude：') + m.text
+        (m.role === 'user' ? (L==='zh'?'我':'Me') + '：' : 'Claude：') + m.text
       ).join('\n\n');
-      apiText = '以下是我们的对话历史：\n\n' + context + '\n\n我（继续）：' + text;
+      apiText = (L==='zh'?'以下是我们的对话历史':'Here is our conversation history') + '：\n\n' + context + '\n\n' + (L==='zh'?'我（继续）':'Me (continuing)') + '：' + text;
     }
   }
 
@@ -1226,7 +1420,7 @@ async function sendToClaude() {
   // Try server first (with AI reply)
   if (apiOnline) {
     try {
-      btn.innerHTML = '<span class="spinner"></span> Claude 正在读你的文字…';
+      btn.innerHTML = '<span class="spinner"></span> ' + t('spinner_reading');
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1245,6 +1439,7 @@ async function sendToClaude() {
 
   if (!sent) {
     copyToClipboard(apiText, prompt);
+    toast(t('toast_copied'));
   }
 
   // ── 只把「新消息」加入线程，不重复旧内容 ──
@@ -1282,11 +1477,11 @@ async function sendToClaude() {
   initStars();
 
   if (reply) {
-    toast('已追加到星辰 ✦ Claude 已回复');
+    toast(t('toast_claude_replied'));
   } else if (sent) {
-    toast('已追加到星辰 · 等待 Claude 回复');
+    toast(t('toast_claude_wait'));
   } else {
-    toast('已存入星辰 · 在电脑上继续对话');
+    toast(t('toast_claude_saved'));
   }
 
   btn.innerHTML = origHTML;
