@@ -1,0 +1,24 @@
+{
+  "name": "思在 — 哲学思辨花园",
+  "short_name": "思在",
+  "description": "每日一问，书写思辨。你的每一段文字，都会变成一颗星。",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192'><rect width='192' height='192' rx='40' fill='%230a0a0f'/><text x='96' y='124' text-anchor='middle' font-size='110' font-family='serif'>🌿</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='512' height='512' rx='100' fill='%230a0a0f'/><text x='256' y='330' text-anchor='middle' font-size='280' font-family='serif'>🌿</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

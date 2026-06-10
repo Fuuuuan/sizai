@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+inbox.md
+replies.json
+.DS_Store
+.claude/

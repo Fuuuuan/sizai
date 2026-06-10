@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>思·在 — 哲学思辨花园</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: rgba(20,20,40,0.7);
+    --text: #c8c8d4;
+    --text-bright: #e8e8f0;
+    --accent: #d4a854;
+    --accent-dim: rgba(212,168,84,0.15);
+    --accent-glow: rgba(212,168,84,0.3);
+    --border: rgba(255,255,255,0.06);
+    --radius: 16px;
+    --font-cn: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "KaiTi", "STSong", serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.7;
+  }
+
+  #starfield {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    z-index: 0; pointer-events: none;
+  }
+
+  #app {
+    position: relative; z-index: 1;
+    max-width: 720px; margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+
+  header {
+    text-align: center; padding: 48px 0 32px;
+  }
+  header h1 {
+    font-family: var(--font-cn);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 0.08em;
+    background: linear-gradient(135deg, #e8e8f0 0%, #d4a854 60%, #c8a048 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header .subtitle {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: rgba(200,200,220,0.5);
+    letter-spacing: 0.15em;
+    font-family: var(--font-cn);
+  }
+  .api-status {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 0.7rem;
+    padding: 4px 12px;
+    border-radius: 12px;
+    letter-spacing: 0.06em;
+  }
+  .api-status.online {
+    background: rgba(100,200,120,0.12);
+    color: rgba(140,220,160,0.8);
+  }
+  .api-status.offline {
+    background: rgba(200,200,200,0.06);
+    color: rgba(200,200,220,0.35);
+  }
+
+  nav {
+    display: flex; justify-content: center; gap: 4px;
+    margin-bottom: 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 40px; padding: 4px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  nav button {
+    flex: 1; padding: 10px 16px;
+    border: none; border-radius: 36px;
+    background: transparent;
+    color: rgba(200,200,220,0.55);
+    font-size: 0.85rem; cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-cn);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  nav button.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  nav button:hover:not(.active) {
+    color: rgba(200,200,220,0.8);
+  }
+
+  .panel {
+    display: none;
+    animation: fadeUp 0.5s ease;
+  }
+  .panel.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 28px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    margin-bottom: 20px;
+  }
+
+  .question-block {
+    text-align: center; padding: 40px 20px;
+  }
+  .question-label {
+    font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    margin-bottom: 20px;
+    font-family: var(--font-sans);
+  }
+  .question-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    margin-left: 8px;
+    letter-spacing: 0.06em;
+    background: var(--accent-dim);
+    color: var(--accent);
+    vertical-align: middle;
+  }
+  .question-text {
+    font-family: var(--font-cn);
+    font-size: clamp(1.2rem, 3vw, 1.6rem);
+    color: var(--text-bright);
+    line-height: 1.8;
+    margin-bottom: 8px;
+    transition: opacity 0.4s ease;
+  }
+  .question-source {
+    font-size: 0.8rem;
+    color: rgba(200,200,220,0.35);
+    margin-top: 16px;
+  }
+  .question-actions {
+    display: flex; gap: 12px; justify-content: center;
+    margin-top: 28px; flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 24px;
+    border-radius: 24px; border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.25s ease;
+    font-family: var(--font-cn);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+  .btn.primary {
+    background: var(--accent-dim);
+    border-color: rgba(212,168,84,0.3);
+    color: var(--accent);
+  }
+  .btn.primary:hover {
+    background: rgba(212,168,84,0.25);
+  }
+  .btn:disabled {
+    opacity: 0.4; cursor: not-allowed; pointer-events: none;
+  }
+
+  .write-area {
+    width: 100%; min-height: 260px;
+    background: rgba(10,10,20,0.5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    color: var(--text);
+    font-family: var(--font-cn);
+    font-size: 1rem;
+    line-height: 1.9;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.3s;
+  }
+  .write-area:focus {
+    border-color: rgba(212,168,84,0.4);
+    box-shadow: 0 0 30px rgba(212,168,84,0.08);
+  }
+  .write-area::placeholder {
+    color: rgba(200,200,220,0.2);
+  }
+  .write-meta {
+    display: flex; gap: 12px; align-items: center;
+    margin-top: 12px; flex-wrap: wrap;
+    font-size: 0.8rem; color: rgba(200,200,220,0.4);
+  }
+  .write-meta .prompt-ref {
+    color: var(--accent);
+    font-style: italic;
+  }
+  .char-count { margin-left: auto; }
+
+  /* ── Constellation / Garden ── */
+  .constellation-container {
+    position: relative;
+    width: 100%;
+    min-height: 520px;
+    border-radius: var(--radius);
+    background: rgba(8,8,18,0.5);
+    border: 1px solid var(--border);
+    cursor: default;
+  }
+  .constellation-canvas {
+    position: absolute; top:0; left:0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .entry-star {
+    position: absolute;
+    z-index: 1;
+    cursor: pointer;
+    /* Large invisible hit area so hover doesn't flicker */
+    width: 80px; height: 80px;
+    margin-left: -40px; margin-top: -40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.3s ease;
+  }
+  .entry-star:hover {
+    filter: brightness(1.6);
+    z-index: 10;
+  }
+  .entry-star.show-tooltip {
+    filter: brightness(1.6);
+    z-index: 10;
+  }
+  .entry-star .star-core {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #f0d080 0%, #d4a854 40%, rgba(212,168,84,0.2) 70%, transparent 100%);
+    box-shadow: 0 0 16px rgba(212,168,84,0.6), 0 0 40px rgba(212,168,84,0.2), 0 0 80px rgba(212,168,84,0.08);
+    flex-shrink: 0;
+    position: relative;
+    pointer-events: none;
+  }
+  .entry-star.large .star-core {
+    width: 22px; height: 22px;
+    box-shadow: 0 0 24px rgba(212,168,84,0.8), 0 0 56px rgba(212,168,84,0.3), 0 0 100px rgba(212,168,84,0.12);
+  }
+  .entry-star.small .star-core {
+    width: 10px; height: 10px;
+    box-shadow: 0 0 10px rgba(212,168,84,0.4), 0 0 24px rgba(212,168,84,0.12);
+  }
+  .entry-star .star-halo {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(212,168,84,0.12);
+    pointer-events: none;
+    animation: haloPulse 3s ease-in-out infinite;
+  }
+  .entry-star.large .star-halo { width: 56px; height: 56px; }
+  .entry-star.small .star-halo { width: 28px; height: 28px; }
+  @keyframes haloPulse {
+    0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.5); }
+  }
+  .entry-star .star-label {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.65rem;
+    color: rgba(200,200,220,0.4);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition: color 0.3s;
+    pointer-events: none;
+  }
+  .entry-star.show-tooltip .star-label {
+    color: rgba(212,168,84,0.9);
+  }
+  .entry-star.show-tooltip .delete-star {
+    display: block;
+  }
+  .entry-star .delete-star {
+    display: none;
+    position: absolute;
+    top: -6px; right: -6px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgba(30,30,50,0.9);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(200,200,220,0.5);
+    font-size: 0.6rem;
+    cursor: pointer;
+    line-height: 16px;
+    text-align: center;
+    z-index: 15;
+  }
+  .entry-star .delete-star:hover {
+    color: #e06060;
+    border-color: rgba(224,96,96,0.4);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: rgba(200,200,220,0.25);
+    font-family: var(--font-cn);
+    font-size: 1rem;
+    line-height: 2;
+  }
+
+  .music-form {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .music-form input, .music-form textarea {
+    width: 100%;
+    background: rgba(10,10,20,0.5);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--font-cn);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.3s;
+  }
+  .music-form input:focus, .music-form textarea:focus {
+    border-color: rgba(212,168,84,0.4);
+  }
+  .music-form textarea { min-height: 80px; resize: vertical; }
+  .music-list {
+    margin-top: 20px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .music-entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex; gap: 16px; align-items: flex-start;
+    transition: all 0.2s;
+  }
+  .music-entry:hover { border-color: rgba(212,168,84,0.2); }
+  .music-entry .album-art {
+    width: 48px; height: 48px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2a2a3a, #1a1a2a);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+  }
+  .music-entry .info { flex:1; min-width:0; }
+  .music-entry .song-name {
+    font-weight: 600; color: var(--text-bright);
+    font-size: 0.95rem;
+  }
+  .music-entry .artist {
+    font-size: 0.8rem; color: rgba(200,200,220,0.45);
+    margin-top: 2px;
+  }
+  .music-entry .feeling {
+    font-size: 0.85rem; color: var(--text);
+    margin-top: 6px; line-height: 1.5;
+  }
+  .music-entry .m-date {
+    font-size: 0.7rem; color: rgba(200,200,220,0.25);
+    margin-top: 4px;
+  }
+
+  .toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,30,50,0.9);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    padding: 10px 24px;
+    border-radius: 24px;
+    font-size: 0.85rem;
+    z-index: 100;
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 1.8s forwards;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    pointer-events: none;
+  }
+  @keyframes toastIn  { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+  @keyframes toastOut { from { opacity:1; } to { opacity:0; } }
+
+  .modal-overlay {
+    position: fixed; inset:0; z-index:50;
+    background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: fadeInMod 0.2s ease;
+  }
+  @keyframes fadeInMod { from{opacity:0} to{opacity:1} }
+  .modal {
+    background: #141422;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    max-width: 600px; width: 90vw; max-height: 80vh;
+    overflow-y: auto;
+    font-family: var(--font-cn);
+    line-height: 1.8;
+    color: var(--text);
+  }
+  .modal .m-date { font-size:0.75rem; color:rgba(200,200,220,0.3); }
+  .modal .m-body { margin-top:16px; white-space: pre-wrap; }
+  .modal .close-btn {
+    margin-top:20px;
+    padding:8px 20px;
+    border-radius:20px; border:1px solid var(--border);
+    background:transparent; color:var(--text); cursor:pointer;
+    font-family:var(--font-cn);
+  }
+
+  /* ── Global Tooltip (detached from star DOM, no flicker) ── */
+  .global-tooltip {
+    position: fixed;
+    pointer-events: none;
+    z-index: 200;
+    background: rgba(20,18,35,0.96);
+    border: 1px solid rgba(212,168,84,0.25);
+    border-radius: 12px;
+    padding: 12px 16px;
+    width: 260px;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease, visibility 0.18s ease;
+  }
+  .global-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+  }
+  .global-tooltip .t-date {
+    font-size: 0.65rem;
+    color: rgba(200,200,220,0.4);
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .global-tooltip .t-question {
+    font-family: var(--font-cn);
+    font-size: 0.82rem;
+    color: var(--accent);
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .global-tooltip .t-preview {
+    font-family: var(--font-cn);
+    font-size: 0.75rem;
+    color: rgba(200,200,220,0.6);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(212,168,84,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 500px) {
+    #app { padding: 16px 12px 60px; }
+    .card { padding: 20px 16px; }
+    nav button { font-size: 0.75rem; padding: 8px 10px; }
+    .constellation-container { min-height: 380px; }
+  }
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="思在">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><rect width='180' height='180' rx='36' fill='%230a0a0f'/><text x='90' y='115' text-anchor='middle' font-size='100' font-family='serif'>🌿</text></svg>">
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div id="app">
+  <header>
+    <h1>思·在</h1>
+    <div class="subtitle">THINKING · BEING</div>
+    <div class="api-status offline" id="apiStatus">本地题库</div>
+  </header>
+
+  <nav>
+    <button data-panel="question" class="active">🜁 每日一问</button>
+    <button data-panel="write">✎ 书写</button>
+    <button data-panel="garden">✦ 思之星辰</button>
+    <button data-panel="dialogue">↗ 对话</button>
+    <button data-panel="music">♪ 音乐</button>
+  </nav>
+
+  <!-- QUESTION PANEL -->
+  <section class="panel active" id="panel-question">
+    <div class="card question-block">
+      <div class="question-label" id="questionLabel">今日之问</div>
+      <div class="question-text" id="questionText"></div>
+      <div class="question-source" id="questionSource"></div>
+      <div class="question-actions">
+        <button class="btn" id="btnRefresh" onclick="refreshQuestion()">↻ 换一个问题</button>
+        <button class="btn" id="btnAI" onclick="fetchAIQuestion()" style="position:relative;">
+          ✦ AI 生成
+        </button>
+        <button class="btn primary" onclick="goWriteWithQuestion()">✎ 回应这个问题</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- WRITE PANEL -->
+  <section class="panel" id="panel-write">
+    <div class="card">
+      <div class="write-meta" id="writeMeta" style="margin-top:0; margin-bottom:12px;"></div>
+      <textarea class="write-area" id="writeArea"
+        placeholder="此刻，你在想什么？…"
+      ></textarea>
+      <div class="write-meta">
+        <span class="prompt-ref" id="promptRef"></span>
+        <span class="char-count" id="charCount">0 字</span>
+      </div>
+      <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn primary" onclick="saveEntry()">✦ 保存为星辰</button>
+        <button class="btn" onclick="sendToClaude()" id="btnSend" style="border-color:rgba(180,200,220,0.3);">↗ 与 Claude 思辨</button>
+        <button class="btn" onclick="clearWrite()">清空</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GARDEN PANEL — Constellation -->
+  <section class="panel" id="panel-garden">
+    <div class="constellation-container" id="constellation">
+      <canvas class="constellation-canvas" id="constellationCanvas"></canvas>
+    </div>
+    <div class="empty-state" id="gardenEmpty">
+      还没有文字。<br>去「书写」那里留下你的第一个想法吧。
+    </div>
+  </section>
+
+  <!-- DIALOGUE PANEL -->
+  <section class="panel" id="panel-dialogue">
+    <div class="card" style="text-align:center; padding: 32px 20px;">
+      <p style="font-family:var(--font-cn); color:var(--text-bright); font-size:1.05rem; line-height:1.8;">
+        把你的思辨文字<br>发送给 <span style="color:var(--accent);">Claude</span>，一起探讨。
+      </p>
+      <p style="font-size:0.8rem; color:rgba(200,200,220,0.4); margin-top:12px; line-height:1.6;" id="dialogueStatus">
+        服务器未连接 · 将使用剪贴板模式
+      </p>
+    </div>
+
+    <!-- Unsent queue -->
+    <div class="card" id="queueCard" style="display:none;">
+      <div style="font-size:0.8rem; color:var(--accent); margin-bottom:12px; letter-spacing:0.06em;">
+        ⬡ 待发送的思辨
+      </div>
+      <div id="queueList"></div>
+    </div>
+
+    <!-- Inbox preview (when server connected) -->
+    <div class="card" id="inboxCard" style="display:none;">
+      <div style="font-size:0.8rem; color:rgba(200,200,220,0.5); margin-bottom:12px; letter-spacing:0.06em;">
+        ↖ 已发送的思辨
+      </div>
+      <div id="inboxList"></div>
+    </div>
+
+    <div class="empty-state" id="dialogueEmpty">
+      还没有发送过思辨文字。<br>去「书写」那里，写下你的想法，<br>然后点击「与 Claude 思辨」。
+    </div>
+  </section>
+
+  <!-- MUSIC PANEL -->
+  <section class="panel" id="panel-music">
+    <div class="card">
+      <div class="music-form">
+        <input type="text" id="songName" placeholder="歌曲名">
+        <input type="text" id="artistName" placeholder="艺术家 / 音乐人">
+        <textarea id="musicFeeling" placeholder="这首歌让你想到了什么？它带给你什么样的感受？"></textarea>
+        <button class="btn primary" onclick="saveMusic()" style="align-self:flex-start;">♫ 记录此刻的聆听</button>
+      </div>
+    </div>
+    <div class="music-list" id="musicList"></div>
+  </section>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay" style="display:none;" onclick="closeModal(event)">
+    <div class="modal" id="modalContent"></div>
+  </div>
+
+  <!-- GLOBAL TOOLTIP for constellation stars (detached from star DOM) -->
+  <div class="global-tooltip" id="globalTooltip">
+    <div class="t-date" id="gtDate"></div>
+    <div class="t-question" id="gtQuestion"></div>
+    <div class="t-preview" id="gtPreview"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  CONFIGURATION
+// ═══════════════════════════════════════
+// 部署后把下面这行改成你的 Render URL，例如：
+// const API_BASE = 'https://sizai-xxxx.onrender.com';
+const API_BASE = 'http://localhost:8899';
+
+// ═══════════════════════════════════════
+//  STARFIELD
+// ═══════════════════════════════════════
+const canvas = document.getElementById('starfield');
+const ctx = canvas.getContext('2d');
+let stars = [];
+let w, h;
+
+function resizeCanvas() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', () => { resizeCanvas(); initStars(); });
+
+function initStars() {
+  const count = Math.floor((w * h) / 3000);
+  stars = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: Math.random() * 1.2 + 0.3,
+      a: Math.random(),
+      speed: Math.random() * 0.008 + 0.003,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+  const entries = getEntries();
+  entries.forEach((entry, i) => {
+    const angle = (i / Math.max(entries.length, 1)) * Math.PI * 2;
+    const radius = Math.min(w, h) * 0.25;
+    stars.push({
+      x: w/2 + Math.cos(angle) * radius * (0.4 + Math.random() * 0.6),
+      y: h/2 + Math.sin(angle) * radius * (0.4 + Math.random() * 0.6),
+      r: 1.5 + Math.random() * 1.5,
+      a: 0.7 + Math.random() * 0.3,
+      speed: 0.015 + Math.random() * 0.02,
+      phase: Math.random() * Math.PI * 2,
+      isEntry: true
+    });
+  });
+}
+
+function drawStars() {
+  ctx.clearRect(0, 0, w, h);
+  const t = Date.now() / 1000;
+  for (const s of stars) {
+    const alpha = s.a * (0.5 + 0.5 * Math.sin(t * s.speed * 3 + s.phase));
+    if (s.isEntry) {
+      ctx.fillStyle = `rgba(212,168,84,${alpha * 0.8})`;
+      ctx.shadowColor = `rgba(212,168,84,${alpha * 0.5})`;
+      ctx.shadowBlur = 6;
+    } else {
+      ctx.fillStyle = `rgba(200,210,240,${alpha})`;
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  requestAnimationFrame(drawStars);
+}
+
+initStars();
+drawStars();
+
+// ═══════════════════════════════════════
+//  QUESTION BANK (200+ questions)
+// ═══════════════════════════════════════
+const QUESTION_BANK = [
+  // ── 存在与自我 ──
+  { q: "如果「自我」只是一串不断变化的记忆和感受，那「我」到底是谁？", src: "—— 佛教「无我」与休谟的怀疑" },
+  { q: "你是否曾经在某个瞬间，感到与整个世界融为一体？那个瞬间发生了什么？", src: "—— 神秘主义体验与宇宙意识" },
+  { q: "当你独处时，你是谁？当你和不同的人在一起时，你还是同一个人吗？", src: "—— 社会自我与真实自我" },
+  { q: "身体是你的一部分，还是你就是你的身体？如果你的身体换了，你还是你吗？", src: "—— 具身认知与人格同一性" },
+  { q: "你梦里的那个「你」，和现在醒着的「你」，是同一个「你」吗？", src: "—— 庄子梦蝶与意识连续性问题" },
+  { q: "如果有两个一模一样的你——同样的记忆、性格、身体——哪个才是真正的你？", src: "—— 人格同一性的思想实验" },
+  { q: "你的名字是你吗？如果换一个名字活一辈子，你会变成另一个人吗？", src: "—— 语言与身份构建" },
+  { q: "「做自己」是什么意思？如果「自己」本身就在不断变化，你该做哪一个自己？", src: "—— 存在先于本质" },
+  { q: "你是不是你所有选择的总和？那没做的那些选择，它们也是你的一部分吗？", src: "—— 可能性与真实性" },
+  { q: "此刻正在读这句话的「你」，和昨天那个「你」，是同一个存在吗？", src: "—— 时间中的自我同一性" },
+  { q: "如果一个人的记忆被完全抹去，他是否变成了另一个人？", src: "—— 洛克论人格同一性" },
+  { q: "你觉得自己最「像自己」的时刻是什么时候？", src: "—— 本真性的现象学" },
+
+  // ── 自由与选择 ──
+  { q: "自由意志真的存在吗？如果你的每一个决定都可以被先前的因果链条解释——那「选择」意味着什么？", src: "—— 决定论 vs 自由意志" },
+  { q: "什么是真正的自由？是不受约束，还是能够按照自己的意志去选择——即使那个意志本身是被塑造的？", src: "—— 积极自由与消极自由" },
+  { q: "选择越多就越自由吗？还是选择本身变成了一种负担？", src: "—— 选择悖论与存在主义" },
+  { q: "当你「不选择」的时候，你其实已经做了一个选择——这个说法对吗？", src: "—— 萨特：「人被判定为自由」" },
+  { q: "如果有一个机器能让你体验任何你想要的人生——你会按那个按钮吗？", src: "—— 诺齐克的体验机器" },
+  { q: "你觉得你的生活中有多少是真正由你决定的？10%？50%？还是 0%？", src: "—— 宿命论与能动性" },
+  { q: "后悔意味着什么？它是否暗示着我们在那个时刻原本「可以」做出不同的选择？", src: "—— 自由意志与道德责任" },
+  { q: "如果科学证明自由意志是一种幻觉，你还会为自己的选择感到骄傲或羞愧吗？", src: "—— 神经决定论的伦理后果" },
+  { q: "你愿意放弃多少自由来换取安全感和确定性？", src: "—— 自由与安全的辩证" },
+
+  // ── 虚无、荒谬与意义 ──
+  { q: "虚无是什么颜色？不是黑色——黑色也是一种颜色。试着描述「无」。", src: "—— 海德格尔与存在的边界" },
+  { q: "如果生命终将归于虚无，那此刻的意义从哪里来？", src: "—— 加缪与荒谬" },
+  { q: "如果「意义」是一种人类发明而不是宇宙属性——这意味着什么？是解放，还是虚无？", src: "—— 虚无主义与存在主义的岔路口" },
+  { q: "你害怕的到底是死亡本身，还是「不再存在」这个念头？", src: "—— 伊壁鸠鲁：「我在，死不在；死在，我不在」" },
+  { q: "西西弗斯推石头——你觉得他快乐吗？如果快乐，为什么？", src: "—— 加缪：「必须想象西西弗斯是快乐的」" },
+  { q: "当你觉得一切都没有意义的时候，是什么让你继续走下去？", src: "—— 日常生活中的存在主义" },
+  { q: "荒诞感是什么？它从哪里来？是世界的错，还是我们期待的错？", src: "—— 荒谬的诞生" },
+  { q: "如果你只有一个月可以活，你会怎么过？——那你现在为什么不那么过？", src: "—— 死亡的警醒与拖延" },
+  { q: "希望是一种美德，还是一种幻觉？它让你前行，还是让你逃避现实？", src: "—— 潘多拉魔盒与希望哲学" },
+  { q: "如果宇宙对你毫不在意——这是令人绝望的，还是令人释然的？", src: "—— 宇宙视角下的存在" },
+  { q: "虚无主义之后，还能有什么？", src: "—— 尼采与价值重估" },
+
+  // ── 时间与存在 ──
+  { q: "你是在「度过」时间，还是在「成为」时间？", src: "—— 柏格森与绵延（durée）" },
+  { q: "「现在」有多长？一秒钟？一瞬间？还是「现在」根本不存在？", src: "—— 奥古斯丁与时间的悖论" },
+  { q: "过去还在吗？未来已经存在了吗？还是只有「此刻」是真实的？", src: "—— 时间哲学与永恒论" },
+  { q: "如果可以回到过去——你会选择保留现在的记忆，还是重新经历一次？两者的区别是什么？", src: "—— 记忆与经历的哲学差异" },
+  { q: "记忆是可靠的过去吗？还是每一次回忆，都是一次重新构造？", src: "—— 记忆哲学与叙事同一性" },
+  { q: "你是在用时间换生命，还是在用生命换时间？", src: "—— 时间经济学与生命价值" },
+  { q: "无聊的时间为什么过得慢，快乐的时间为什么过得快——时间有速度吗？", src: "—— 时间感知的现象学" },
+  { q: "如果你能暂停时间，那一刻你感受到的自由是什么？——以及随之而来的孤独是什么？", src: "—— 时间暂停思想实验" },
+  { q: "衰老是你，还是发生在你身上的事？", src: "—— 衰老哲学与身体自我" },
+
+  // ── 死亡 ──
+  { q: "你自己的死亡——你能想象它吗？还是每次你尝试想象时，你其实都在「旁观」？", src: "—— 死亡的现象学困境" },
+  { q: "如果科技让你永生，你会选择永生吗？永生的代价是什么？", src: "—— 不朽与生命意义" },
+  { q: "你希望被记住吗？如果一千年后没有人记得你，你当下所做的一切还重要吗？", src: "—— 死亡与遗产" },
+  { q: "死是生命的一部分，还是生命的反面？", src: "—— 死亡的本体论" },
+  { q: "如果死后有来生——你会选择和这一世完全不同的人生，还是相似的人生？", src: "—— 永恒轮回与选择" },
+  { q: "你最害怕失去的是什么？那个东西有一天会失去吗？", src: "—— 死亡焦虑与执念" },
+
+  // ── 意识与心灵 ──
+  { q: "你和他人的意识之间，隔着什么？你怎么知道别人也有内心世界？", src: "—— 他心问题（Problem of Other Minds）" },
+  { q: "如果有一个人工智能能够完美模拟人类的对话和情感——它拥有意识吗？你怎么判断？", src: "—— 图灵测试与意识的难题" },
+  { q: "意识是什么？它是大脑产生的一种「分泌物」，还是一种根本不同的东西？", src: "—— 心身问题与「困难问题」" },
+  { q: "颜色存在于哪里？在物体表面，在你的眼睛里，还是在你的意识里？", src: "—— 感受质（Qualia）与主观经验" },
+  { q: "如果你能「进入」另一个人的意识一秒钟，你会想体验什么？", src: "—— 主体间性与同理心的极限" },
+  { q: "动物有意识吗？一只猫、一只鸟、一只蚂蚁——你在哪里划那条线？", src: "—— 动物意识与道德圈" },
+  { q: "当你「想」一件事的时候——那个「想」是什么材质的？它有形状吗？", src: "—— 思维的现象学" },
+  { q: "「我思故我在」——如果停止思考，「我」还存在吗？", src: "—— 笛卡尔与存在的根基" },
+  { q: "为什么会有「意识」这个东西存在？一个没有意识的世界不是更「经济」吗？", src: "—— 意识的进化谜题" },
+
+  // ── 语言与真实 ──
+  { q: "语言是思想的容器，还是思想的牢笼？那些你说不出的感受，它们真实存在吗？", src: "—— 维特根斯坦：「语言的边界就是世界的边界」" },
+  { q: "沉默可以是一种语言吗？如果可以，它在说什么？", src: "—— 沉默哲学与「不说之说」" },
+  { q: "如果你从未学过任何语言，你还能思考吗？你的思考会是什么样子？", src: "—— 语言与思维的关系" },
+  { q: "有没有一种感受，你确定它存在，但你永远无法用语言传达给别人？", src: "—— 私人语言论证" },
+  { q: "「真实」这个词本身是真实的吗？还是它只是一个方便的标签？", src: "—— 语言与实在论" },
+  { q: "当你说「我爱你」的时候，这三个字传达的是什么？是你真实的感受，还是一个社会约定的符号？", src: "—— 言语行为与情感真实性" },
+  { q: "谎言和虚构有什么区别？文学小说是不是一种「美丽的谎言」？", src: "—— 虚构哲学与真理" },
+  { q: "如果你把一生所有的话都录下来——那些话加起来，是你的全部吗？", src: "—— 语言与存在的总和" },
+
+  // ── 爱与关系 ──
+  { q: "当你爱一个人的时候，你爱的是那个人本身，还是那个人给你带来的感受？", src: "—— 爱的现象学" },
+  { q: "爱是需求还是给予？如果你不需要任何人却还是选择了爱——那是什么？", src: "—— 爱的本质：匮乏还是溢出" },
+  { q: "你能完全了解另一个人吗？如果不能，你爱的是一个「真实的人」还是一个「你的投射」？", src: "—— 他者与爱情的认识论" },
+  { q: "孤独是缺少别人，还是缺少自己？", src: "—— 孤独的两种形态" },
+  { q: "「在一起」意味着什么？两个人在同一个空间、度过同一段时间——这就是「在一起」吗？", src: "—— 共在（Mitsein）的现象学" },
+  { q: "如果你爱一个人，你应该希望他们成为最好的自己——即使那个「最好的自己」不包括你吗？", src: "—— 爱的伦理与自我牺牲" },
+  { q: "人与人之间的「连接」是什么？它是一种实际存在的东西，还是一个我们共同制造的幻觉？", src: "—— 连接的本体论" },
+
+  // ── 痛苦与幸福 ──
+  { q: "痛苦有意义吗？如果有，这个意义是它自身具有的，还是我们赋予的？", src: "—— 苦难的意义与尼采的「amor fati」" },
+  { q: "幸福是什么？是你得到你想要的，还是你想要你已经得到的？", src: "—— 欲望与满足的辩证法" },
+  { q: "如果你能消除世界上所有的痛苦——你会吗？一个没有痛苦的世界是什么样的？", src: "—— 痛苦的必要性" },
+  { q: "你不快乐是因为生活不够好，还是因为你期待的太多？", src: "—— 斯多亚主义与欲望管理" },
+  { q: "快乐和意义——如果只能选一个，你选哪个？", src: "—— 快乐主义 vs 意义导向" },
+  { q: "承受痛苦的能力是否比感受快乐的能力更值得尊敬？", src: "—— 苦难的伦理地位" },
+
+  // ── 美与感知 ──
+  { q: "你上一次真正「看见」一棵树是什么时候？不是认出它是一棵树，而是看见它本身。", src: "—— 现象学：回到事物本身" },
+  { q: "美是事物自身的属性，还是观看者内心的投射？", src: "—— 美学的基本问题" },
+  { q: "丑的东西可以美吗？破碎的、残缺的、衰败的——有没有一种美藏在里面？", src: "—— 否定美学与侘寂" },
+  { q: "为什么有些音乐让你想哭？声音只是空气振动——情感从哪里来？", src: "—— 音乐哲学与情感" },
+  { q: "如果你从未见过「美」这个概念——你还能感受到美吗？", src: "—— 美的先天性与文化建构" },
+  { q: "宇宙是美的吗？如果是，这种美是为谁而存在的？", src: "—— 宇宙美学与目的论" },
+  { q: "日落为什么感人？是因为它美，还是因为它短暂？", src: "—— 时间性与审美体验" },
+
+  // ── 知识与真实 ──
+  { q: "你怎么知道你此刻不是在做梦？不是在一个模拟器中？", src: "—— 笛卡尔的怀疑与模拟假说" },
+  { q: "「知道」一件事意味着什么？是你能背出来，还是你能感觉到，还是你能用出来？", src: "—— 知识的定义与葛梯尔问题" },
+  { q: "真理存在吗？如果存在，它是被发现的，还是被发明的？", src: "—— 真理符合论 vs 建构论" },
+  { q: "科学和艺术——谁更接近真实？还是它们面对的是不同的真实？", src: "—— 两种知识的分界" },
+  { q: "你相信的东西是你选择的，还是你被说服的？相信和知道有什么不同？", src: "—— 信念伦理学" },
+  { q: "如果全世界都相信一件事——这件事就变成真的了吗？", src: "—— 真理与社会建构" },
+  { q: "有些东西你必须先相信，才能理解——这是知识的起点还是信仰的陷阱？", src: "—— 安瑟伦 vs 证据主义" },
+  { q: "无知是不是一种选择？在某些时候，知道更多是否反而更痛苦？", src: "—— 无知的权利与知识伦理" },
+
+  // ── 伦理与正义 ──
+  { q: "如果一个行为出于善意却导致了灾难——它是善的还是恶的？道德评判应该看动机还是看结果？", src: "—— 义务论 vs 后果论" },
+  { q: "你是否对陌生人负有责任？如果是，这种责任从哪里来？如果不是，为什么？", src: "—— 普世伦理与道德圈" },
+  { q: "如果可以牺牲一个人来救五个人——你会按那个按钮吗？", src: "—— 电车难题与道德直觉" },
+  { q: "宽恕是什么？是忘记、是放下、还是一种更高的力量？", src: "—— 宽恕的哲学" },
+  { q: "你是一个好人吗？你用什么标准来判断？", src: "—— 道德自我评价" },
+
+  // ── 中国哲学 ──
+  { q: "「无为」不是什么都不做——那它到底是什么？你在生活中体验过「无为」吗？", src: "—— 老子与无为之道" },
+  { q: "「庄周梦蝶」——如果人生是一场大梦，你愿意醒来吗？", src: "—— 庄子与存在的虚幻性" },
+  { q: "水是最柔软的，却能穿石。你生命中有没有「柔软胜刚强」的体验？", src: "—— 老子与柔弱哲学" },
+  { q: "「仁」是什么？是爱别人，是同理心，还是别的什么？", src: "—— 孔子与仁的伦理" },
+  { q: "「心外无物」——如果你没有看见一朵花，那朵花还存在吗？", src: "—— 王阳明与心学" },
+  { q: "「道可道，非常道」——最真的东西是不是永远说不出来？那些说出来的，是不是已经偏离了真实？", src: "—— 老子与语言的局限" },
+  { q: "「吾丧我」是什么意思？失去了「我」，剩下的是什么？", src: "—— 庄子与自我的消解" },
+  { q: "有用和无用——大树因为「无用」而活千年，你觉得自己「有用」吗？谁定义的「有用」？", src: "—— 庄子与效用批判" },
+  { q: "「天人合一」是一种感受还是一个事实？你体验过和自然「合一」的瞬间吗？", src: "—— 中国哲学中的天人关系" },
+
+  // ── 技术与现代 ──
+  { q: "手机是你的延伸，还是你的替代品？当它扩展你的同时，是否也截断了什么？", src: "—— 麦克卢汉与技术哲学" },
+  { q: "社交网络上的「你」和真实的你——谁更真实？还是各有各的真实？", src: "—— 数字身份与真实性" },
+  { q: "算法比你更了解你的欲望——那你还是你欲望的主人吗？", src: "—— 算法治理与自主性" },
+  { q: "技术进步让我们更自由了吗？还是我们只是换了一种方式被束缚？", src: "—— 技术决定论 vs 技术工具论" },
+  { q: "如果 AI 能写诗、画画、作曲——艺术还是艺术吗？还是艺术必须来自人的灵魂？", src: "—— AI 与创造力的哲学" },
+
+  // ── 日常中的哲学 ──
+  { q: "你上一次感到「惊奇」是什么时候？惊奇和好奇有什么不同？", src: "—— 哲学始于惊奇（亚里士多德）" },
+  { q: "等待是什么？你是在等待某个东西，还是在等待中度过了你的生命？", src: "—— 等待的现象学" },
+  { q: "「家」是什么？是一个地方、一种感觉、还是某些人的存在？", src: "—— 海德格尔的「栖居」" },
+  { q: "仪式感为什么重要？重复的动作和话语，如何承载意义？", src: "—— 日常仪式与意义建构" },
+  { q: "游戏和工作有什么区别？如果工作让你快乐，它是不是就成了游戏？", src: "—— 游戏哲学与劳动意义" },
+  { q: "「无聊」是什么？它是不是一种信号——提醒你某些东西缺失了？", src: "—— 无聊的存在主义解读" },
+  { q: "散步的时候，你的思绪去了哪里？身体在走，灵魂也在走吗？", src: "—— 行走与思考的现象学" },
+  { q: "为什么告别总是沉重的？再见的那一刻，到底在告别什么？", src: "—— 告别与时间的体验" },
+  { q: "「日常」是最难被看见的东西——为什么最重要的事物反而最容易被忽略？", src: "—— 海德格尔与上手状态" },
+
+  // ── 终极问题 ──
+  { q: "为什么有存在，而不是什么都没有？", src: "—— 莱布尼茨与海德格尔的终极之问" },
+  { q: "宇宙有目的吗？如果有，是谁或什么赋予的？如果没有，那我们为什么要做任何事？", src: "—— 目的论与宇宙意义" },
+  { q: "如果宇宙是一个巨大的巧合——这个巧合本身，算不算一种奇迹？", src: "—— 偶然性与惊奇" },
+  { q: "神存在吗？如果不存在，为什么几乎每个文明都发明了神？如果存在，为什么有那么多不同的神？", src: "—— 宗教哲学的基本张力" },
+  { q: "第一个生命是怎么从非生命中诞生的？那个「活过来」的瞬间，发生了什么？", src: "—— 生命起源与活力论" },
+
+  // ── 更多问题（扩充中）──
+  { q: "你能真正「原谅」一个人吗？原谅意味着什么——忘记伤害、还是超越伤害？", src: "—— 宽恕哲学的深度" },
+  { q: "孤独和独处是一回事吗？一个人可以在人群中感到孤独吗？", src: "—— 孤独的现象学区分" },
+  { q: "你的「性格」是你选择的结果还是环境塑造的产物？如果是后者，你该为自己的行为负责吗？", src: "—— 性格与道德责任" },
+  { q: "「成长」意味着什么？是你变得更好了，还是你变得更能适应了？", src: "—— 成长哲学的批判" },
+  { q: "遗忘是一种缺陷还是一种能力？如果什么都忘不掉，生活还能继续吗？", src: "—— 遗忘的哲学与博尔赫斯" },
+  { q: "「正常」是谁定义的？偏离「正常」是自由还是危险？", src: "—— 福柯与正常化的权力" },
+  { q: "欲望满足之后的那一瞬间——你感受到的是什么？是满足，还是空虚？", src: "—— 欲望结构与享乐悖论" },
+  { q: "羡慕和嫉妒的区别是什么？哪一个更接近「爱」？", src: "—— 情感现象学" },
+  { q: "如果你是另一个人，你会和现在的你成为朋友吗？", src: "—— 自我认知的视角转换" },
+  { q: "时间是线性的吗？还是我们在回忆和期待中，不断地重新编织它？", src: "—— 叙事时间与线性时间" },
+  { q: "你是否曾经在音乐中「消失」？当一首曲子结束，你回到自己——那个「消失」的你去哪了？", src: "—— 音乐与自我消融体验" },
+  { q: "如果你把一个物体上的每一个原子都替换掉——它还是原来那个物体吗？你也是同理吗？", src: "—— 忒修斯之船与人格同一性" },
+  { q: "「直觉」是什么？它是未经思考的知识，还是思考之前的某种东西？", src: "—— 直觉的认识论" },
+  { q: "承诺的力量从哪来？说出一句话——「我答应你」——怎么就能约束未来的行为？", src: "—— 言语行为哲学与承诺" },
+  { q: "如果你知道你永远不会被抓住，你会做一些你平时不做的事吗？那这些事反映了你的「真实自我」吗？", src: "—— 道德与隐秘自我" },
+  { q: "你能为自己不存在的想法负责吗？一个突然闯入脑海的恶念，是你的吗？", src: "—— 思想的所有权与道德责任" },
+  { q: "什么都不做，做白日梦——这是浪费时间，还是生命中最重要的事？", src: "—— 闲散的哲学辩护" },
+  { q: "你的身体在变老，但你的「内心」似乎停留在了某个年龄——那个年龄是几岁？", src: "—— 主观年龄与时间体验" },
+  { q: "「命运」这个词——是解释过去的修辞，还是指引未来的力量？", src: "—— 命运概念的解构" },
+  { q: "如果你不能和任何人交流——你的思想还能存在吗？它们还是思想吗？", src: "—— 孤独心灵中的语言与思维" },
+  { q: "你在镜子中看到的那个人，是你，还是你的「反面」？左边和右边互换了，他还是你吗？", src: "—— 镜像自我与身体图式" },
+  { q: "什么是「经验」？做同一件事一百次，你获得的是经验还是习惯？经验和习惯有什么区别？", src: "—— 经验的哲学分析" },
+  { q: "「天赋」真的存在吗？如果有，拥有天赋的人应该因此得到更多吗？", src: "—— 天赋与分配正义" },
+  { q: "一个人可以同时是善的又是恶的吗？还是善恶是不同层面的东西？", src: "—— 道德复杂性" },
+  { q: "思想的速度有多快？你能控制自己思考的速度吗？", src: "—— 思维速度的现象学" },
+  { q: "「安静」是一种声音吗？如果你在一个绝对安静的空间里，你听到的是什么？", src: "—— 寂静的感知哲学" },
+  { q: "幽默是什么？为什么有些东西「好笑」？笑的时候，你在笑什么？", src: "—— 幽默哲学与笑的本质" },
+  { q: "「足够」是多少？什么时候你拥有的东西「够了」？", src: "—— 满足的哲学与欲望的终结" },
+  { q: "意外发生的时候——比如打翻一杯水——那一刻你的反应，暴露了你的什么？", src: "—— 微小事件中的自我揭示" },
+  { q: "什么是「成熟」？是变得更理性，还是变得更能接受自己非理性的一面？", src: "—— 成熟概念的批判" },
+  { q: "你和童年的你——如果见面了，你们会认出对方吗？", src: "—— 童年自我与成年自我的连续性" },
+
+  // ── 更多冲击力的问题 ──
+  { q: "「我不知道」——这是不是你最诚实的一句话？", src: "—— 苏格拉底与知无知" },
+  { q: "此刻你呼吸的空气——它曾经穿过多少人的肺？这个想法让你感到连接还是恐惧？", src: "—— 物质循环与存在连接" },
+  { q: "你有多少想法是你自己的？有多少是你从别人那里借来、却以为是自己的？", src: "—— 思想的所有权" },
+  { q: "当你生气的时候——是「你」在生气，还是某个比「你」更古老的东西借你的身体在生气？", src: "—— 情绪的自我与非自我" },
+  { q: "你生命中最重要的决定——它们是在清醒的状态下做的，还是在某种恍惚中？", src: "—— 重大决策的现象学" },
+  { q: "如果把你一生的所有瞬间拍成一部电影——你会看吗？你会快进哪些部分？", src: "—— 生命全景回顾" },
+  { q: "什么是「准备好了」？有没有什么事是你永远也「没有准备好」的？", src: "—— 准备与行动之间" },
+  { q: "「最后一次」——当你意识到这是最后一次做某件事的时候，那种感觉叫什么？", src: "—— 终末体验的现象学" },
+  { q: "你是否有过「被看见」的体验？不是被眼睛看见，而是被另一个灵魂认出了你。", src: "—— 承认与主体间性" },
+  { q: "你能听见你自己思考的声音吗？那个声音是谁的？", src: "—— 内在言语与自我" },
+  { q: "「当下」这个瞬间——在你意识到它的那一刻，它已经过去了。所以你永远追不上「当下」吗？", src: "—— 现在的悖论" },
+  { q: "你是因为快乐才笑，还是因为笑了才快乐？情绪是原因还是结果？", src: "—— 情绪的身体理论" },
+  { q: "照片里的那个人是你吗？如果所有的照片都在撒谎——它们定格了流动的东西——那什么才是真相？", src: "—— 影像哲学与真实性" },
+  { q: "如果你换了一种语言生活——你的性格会改变吗？你的价值观呢？", src: "—— 语言相对论与自我" },
+  { q: "什么时候你觉得自己「不是一个东西」？不是物体，不是标签，不是任何可以定义的存在？", src: "—— 超越定义的存在体验" },
+];
+
+// ═══════════════════════════════════════
+//  QUESTION ENGINE
+// ═══════════════════════════════════════
+let apiOnline = false;
+let currentQuestion = null;
+
+function getDailySeed() {
+  const today = new Date().toISOString().slice(0, 10);
+  let hash = 0;
+  for (let i = 0; i < today.length; i++) {
+    hash = ((hash << 5) - hash) + today.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getDailyQuestion() {
+  const today = new Date().toISOString().slice(0, 10);
+  // Check if we already have today's question cached
+  const stored = localStorage.getItem('sizai_daily');
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      if (data.date === today && data.q) return data;
+    } catch(e) {}
+  }
+  // Deterministic daily pick from the bank
+  const seed = getDailySeed();
+  const idx = seed % QUESTION_BANK.length;
+  const picked = { date: today, index: idx, ...QUESTION_BANK[idx], source: 'bank' };
+  localStorage.setItem('sizai_daily', JSON.stringify(picked));
+  return picked;
+}
+
+function pickRandomQuestion() {
+  // Avoid repeating the last few shown questions
+  const recent = JSON.parse(localStorage.getItem('sizai_recent') || '[]');
+  let available = QUESTION_BANK.filter((_, i) => !recent.includes(i));
+  if (available.length === 0) {
+    available = QUESTION_BANK;
+    recent.length = 0;
+  }
+  const idx = QUESTION_BANK.indexOf(available[Math.floor(Math.random() * available.length)]);
+  // Keep track of last 30 shown to minimize repeats
+  recent.push(idx);
+  if (recent.length > 30) recent.shift();
+  localStorage.setItem('sizai_recent', JSON.stringify(recent));
+  return { ...QUESTION_BANK[idx], source: 'bank' };
+}
+
+function displayQuestion(data) {
+  if (!data) data = getDailyQuestion();
+  currentQuestion = data;
+  document.getElementById('questionText').textContent = data.q;
+  document.getElementById('questionSource').textContent = data.src;
+  if (data.source === 'ai') {
+    document.getElementById('questionLabel').innerHTML = 'AI 之问 <span class="question-badge">实时生成</span>';
+  } else {
+    document.getElementById('questionLabel').textContent = '今日之问';
+  }
+}
+
+async function refreshQuestion() {
+  const btn = document.getElementById('btnRefresh');
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  // Try AI first if online
+  if (apiOnline) {
+    try {
+      const q = await fetchFromAPI();
+      if (q) {
+        currentQuestion = { ...q, source: 'ai' };
+        displayQuestion(currentQuestion);
+        btn.disabled = false;
+        btn.textContent = '↻ 换一个问题';
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // Fall back to bank
+  const q = pickRandomQuestion();
+  currentQuestion = q;
+  displayQuestion(q);
+  btn.disabled = false;
+  btn.textContent = '↻ 换一个问题';
+}
+
+async function fetchAIQuestion() {
+  const btn = document.getElementById('btnAI');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.innerHTML = '<span class="spinner"></span> 生成中…';
+
+  try {
+    const q = await fetchFromAPI();
+    if (q) {
+      currentQuestion = { ...q, source: 'ai' };
+      displayQuestion(currentQuestion);
+      toast('✦ AI 生成的全新问题');
+    }
+  } catch(e) {
+    // Fall back to bank
+    const q = pickRandomQuestion();
+    currentQuestion = q;
+    displayQuestion(q);
+    if (!apiOnline) {
+      toast('AI 服务器未连接，使用本地题库');
+    } else {
+      toast('生成失败，使用本地题库');
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = origText;
+}
+
+async function fetchFromAPI() {
+  const resp = await fetch(`${API_BASE}/api/question`, {
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!resp.ok) throw new Error('API error');
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return { ...data, source: 'ai' };
+}
+
+async function checkAPIStatus() {
+  try {
+    const resp = await fetch(`${API_BASE}/api/ping`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      apiOnline = true;
+      const hasKey = data.has_api_key;
+      document.getElementById('apiStatus').textContent = hasKey ? 'AI 实时生成 · 已连接' : '服务器已连接 · 本地题库';
+      document.getElementById('apiStatus').className = 'api-status online';
+      document.getElementById('btnAI').style.display = hasKey ? '' : '';
+      updateDialogueStatus();
+      return;
+    }
+  } catch(e) {}
+  apiOnline = false;
+  document.getElementById('apiStatus').textContent = '本地题库 · 170+ 问题';
+  document.getElementById('apiStatus').className = 'api-status offline';
+  document.getElementById('btnAI').style.display = '';
+  updateDialogueStatus();
+}
+
+function updateDialogueStatus() {
+  const el = document.getElementById('dialogueStatus');
+  if (!el) return;
+  if (apiOnline) {
+    el.innerHTML = '<span style="color:rgba(140,220,160,0.8);">●</span> 服务器已连接 · 文字直达 Claude';
+  } else {
+    el.innerHTML = '<span style="color:rgba(200,200,200,0.4);">○</span> 离线模式 · 剪贴板发送<br><span style="font-size:0.7rem;">启动直达: <code style="background:rgba(255,255,255,0.04);padding:2px 6px;border-radius:4px;">cd /Users/a/sizai && python3 server.py</code></span>';
+  }
+}
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const panelName = btn.dataset.panel;
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + panelName).classList.add('active');
+    if (panelName === 'garden') renderGarden();
+    if (panelName === 'dialogue') renderDialogue();
+    if (panelName === 'music') renderMusic();
+    if (panelName === 'question' && currentQuestion) displayQuestion(currentQuestion);
+  });
+});
+
+// ═══════════════════════════════════════
+//  WRITE
+// ═══════════════════════════════════════
+let currentPrompt = '';
+let editingId = null;  // 非 null 时表示正在编辑某个已有星辰
+
+function goWriteWithQuestion() {
+  if (!currentQuestion) currentQuestion = getDailyQuestion();
+  currentPrompt = currentQuestion.q;
+  document.getElementById('promptRef').textContent = '回应：「' + currentQuestion.q.slice(0, 40) + '…」';
+  document.getElementById('writeMeta').innerHTML =
+    '<span style="color:var(--accent);">回应问题</span>';
+  switchPanel('write');
+  document.getElementById('writeArea').focus();
+}
+
+function switchPanel(name) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-panel="' + name + '"]').classList.add('active');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+function clearWrite() {
+  document.getElementById('writeArea').value = '';
+  currentPrompt = '';
+  editingId = null;
+  document.getElementById('promptRef').textContent = '';
+  document.getElementById('writeMeta').innerHTML = '';
+  document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存为星辰';
+  updateCharCount();
+}
+
+function updateCharCount() {
+  const len = document.getElementById('writeArea').value.length;
+  document.getElementById('charCount').textContent = len + ' 字';
+}
+
+document.getElementById('writeArea').addEventListener('input', updateCharCount);
+
+function saveEntry() {
+  const text = document.getElementById('writeArea').value.trim();
+  if (!text) { toast('先写点什么吧'); return; }
+  const entries = getEntries();
+
+  if (editingId) {
+    // 编辑模式：更新已有条目
+    const idx = entries.findIndex(e => e.id === editingId);
+    if (idx >= 0) {
+      entries[idx].text = text;
+      if (currentPrompt) entries[idx].prompt = currentPrompt;
+      entries[idx].editedAt = new Date().toISOString();
+      toast('已更新 ✦ 星辰被重新点亮');
+    }
+  } else {
+    // 新建模式
+    entries.unshift({
+      id: Date.now(),
+      text,
+      prompt: currentPrompt || null,
+      date: new Date().toISOString(),
+    });
+    toast('已保存 ✦ 它已经变成一颗星');
+  }
+
+  localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  clearWrite();
+  initStars();
+}
+
+// ═══════════════════════════════════════
+//  ENTRIES / GARDEN
+// ═══════════════════════════════════════
+function getEntries() {
+  try { return JSON.parse(localStorage.getItem('sizai_entries')) || []; }
+  catch(e) { return []; }
+}
+
+function deleteEntry(id) {
+  let entries = getEntries();
+  entries = entries.filter(e => e.id !== id);
+  localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  renderGarden();
+  initStars();
+  toast('已删除');
+}
+
+function renderGarden() {
+  const entries = getEntries();
+  const container = document.getElementById('constellation');
+  const canvas = document.getElementById('constellationCanvas');
+  const empty = document.getElementById('gardenEmpty');
+
+  // Remove old star elements
+  container.querySelectorAll('.entry-star').forEach(el => el.remove());
+
+  if (entries.length === 0) {
+    container.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  container.style.display = 'block';
+  empty.style.display = 'none';
+
+  // Sort oldest → newest
+  const sorted = [...entries].reverse();
+
+  // ── Layout algorithm: timeline constellation ──
+  const pad = 50; // padding from edges
+  const w = container.clientWidth;
+  const h = container.clientHeight || 520;
+
+  // Resize canvas
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  // Calculate positions
+  const points = sorted.map((e, i) => {
+    const t = sorted.length === 1 ? 0.5 : i / (sorted.length - 1);
+    // x: left → right (old → new)
+    const x = pad + t * (w - pad * 2);
+    // y: organic wave pattern, with time-of-day influence
+    const d = new Date(e.date);
+    const hourFrac = d.getHours() / 24;
+    const wave = Math.sin(t * Math.PI * 2.5 + i * 0.7) * (h * 0.18);
+    const timeBias = (hourFrac - 0.5) * (h * 0.25);
+    const y = h / 2 + wave + timeBias;
+    // Clamp to container
+    const cy = Math.max(pad, Math.min(h - pad, y));
+
+    // Size by entry length
+    const len = e.text.length;
+    let sizeClass = '';
+    if (len > 800) sizeClass = 'large';
+    else if (len < 150) sizeClass = 'small';
+
+    return { x, y: cy, entry: e, sizeClass };
+  });
+
+  // ── Draw constellation lines ──
+  ctx.clearRect(0, 0, w, h);
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    const alpha = 0.12 + 0.08 * (i / points.length);
+    ctx.strokeStyle = `rgba(212,168,84,${alpha})`;
+    ctx.lineWidth = 0.6;
+    ctx.setLineDash([3, 6]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    // Gentle curve connecting stars
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2 - 15;
+    ctx.quadraticCurveTo(mx, my, b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Draw subtle background grid stars
+  for (let i = 0; i < 40; i++) {
+    const bx = Math.random() * w;
+    const by = Math.random() * h;
+    const br = Math.random() * 0.8 + 0.2;
+    ctx.fillStyle = `rgba(200,210,240,${Math.random() * 0.2 + 0.05})`;
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Create star DOM elements ──
+  const fragment = document.createDocumentFragment();
+  points.forEach((p) => {
+    const e = p.entry;
+    const date = new Date(e.date);
+    const dateStr = date.toLocaleDateString('zh-CN', {
+      month: 'short', day: 'numeric'
+    });
+    const timeStr = date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit', minute: '2-digit'
+    });
+    const fullDateStr = date.toLocaleDateString('zh-CN', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+    const preview = e.text.slice(0, 60);
+
+    const star = document.createElement('div');
+    star.className = 'entry-star ' + p.sizeClass;
+    star.style.left = p.x + 'px';
+    star.style.top = p.y + 'px';
+    star.onclick = () => openEntry(e.id);
+
+    // Stable tooltip via global detached element (no DOM nesting flicker)
+    let hideTimer;
+    star.addEventListener('mouseenter', (ev) => {
+      clearTimeout(hideTimer);
+      star.classList.add('show-tooltip');
+      // Populate and position global tooltip
+      const gt = document.getElementById('globalTooltip');
+      document.getElementById('gtDate').textContent = fullDateStr + ' · ' + timeStr;
+      document.getElementById('gtQuestion').innerHTML = e.prompt
+        ? '「' + escapeHtml(e.prompt.slice(0, 80)) + '」'
+        : '';
+      document.getElementById('gtPreview').textContent = preview ? preview + '…' : '';
+      gt.classList.add('visible');
+      positionTooltip(gt, star);
+    });
+    star.addEventListener('mouseleave', () => {
+      hideTimer = setTimeout(() => {
+        star.classList.remove('show-tooltip');
+        document.getElementById('globalTooltip').classList.remove('visible');
+      }, 150);
+    });
+
+    star.innerHTML = `
+      <div class="star-core"></div>
+      <div class="star-halo"></div>
+      <button class="delete-star" onclick="event.stopPropagation();deleteEntry(${e.id})">×</button>
+      <div class="star-label">${dateStr}</div>
+    `;
+    fragment.appendChild(star);
+  });
+  container.appendChild(fragment);
+
+  // ── Observe resize (debounced to prevent loops) ──
+  if (container._ro) container._ro.disconnect();
+  let resizeTimer;
+  const ro = new ResizeObserver(() => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => renderGarden(), 150);
+  });
+  ro.observe(container);
+  container._ro = ro;
+}
+
+function openEntry(id) {
+  const entries = getEntries();
+  const e = entries.find(en => en.id === id);
+  if (!e) return;
+  const date = new Date(e.date).toLocaleDateString('zh-CN', {
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+  const editedNote = e.editedAt
+    ? '<div class="m-date" style="margin-bottom:8px;">（已编辑）</div>'
+    : '';
+
+  let bodyHTML = `<div class="m-date">${date}</div>${editedNote}`;
+
+  if (e.prompt) {
+    bodyHTML += '<div style="color:var(--accent); margin-bottom:16px; font-style:italic; font-size:0.9rem; line-height:1.5;">「' + escapeHtml(e.prompt) + '」</div>';
+  }
+
+  if (e.thread && e.thread.length > 0) {
+    // ── 对话线程视图 ──
+    bodyHTML += '<div class="thread-view">';
+    e.thread.forEach(msg => {
+      const isUser = msg.role === 'user';
+      const align = isUser ? 'text-align:right; margin-left:32px;' : 'text-align:left; margin-right:32px;';
+      const bubble = isUser
+        ? 'background:rgba(212,168,84,0.07); border:1px solid rgba(212,168,84,0.14);'
+        : 'background:rgba(120,180,160,0.05); border:1px solid rgba(120,180,160,0.1);';
+      const label = isUser ? '💭 你' : '🌿 Claude';
+      const msgDate = new Date(msg.date).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+      bodyHTML += '<div style="' + align + ' margin-bottom:10px;">'
+        + '<div style="font-size:0.6rem; color:rgba(200,200,220,0.3); margin-bottom:2px; letter-spacing:0.04em;">' + label + ' · ' + msgDate + '</div>'
+        + '<div style="display:inline-block; ' + bubble + ' border-radius:12px; padding:10px 14px; font-size:0.86rem; line-height:1.7; text-align:left; word-break:break-word; max-width:100%;">' + escapeHtml(msg.text) + '</div>'
+        + '</div>';
+    });
+    bodyHTML += '</div>';
+
+    // 按钮行：电脑端显示「继续对话」输入框和发送，手机端只显示编辑和关闭
+    if (apiOnline) {
+      bodyHTML += '<div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">'
+        + '<textarea id="threadInput" class="write-area" style="min-height:56px; font-size:0.85rem;" placeholder="继续这段对话…"></textarea>'
+        + '<div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">'
+        + '<button class="btn primary" onclick="sendThreadMessage(' + e.id + ')">↗ 发送</button>'
+        + '<button class="btn" onclick="editEntry(' + e.id + ')">✎ 编辑文字</button>'
+        + '<button class="close-btn" onclick="closeModal()" style="margin-left:auto;">关闭</button>'
+        + '</div></div>';
+    } else {
+      bodyHTML += '<div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px; font-size:0.75rem; color:rgba(200,200,220,0.3); text-align:center;">在电脑上打开思在，连接 Claude 继续这段对话</div>'
+        + '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">'
+        + '<button class="btn" onclick="editEntry(' + e.id + ')">✎ 编辑</button>'
+        + '<button class="close-btn" onclick="closeModal()" style="margin-left:auto;">关闭</button>'
+        + '</div>';
+    }
+  } else {
+    // ── 普通文字视图（无对话线程）──
+    bodyHTML += '<div class="m-body">' + escapeHtml(e.text) + '</div>';
+    bodyHTML += '<div style="display:flex; gap:8px; margin-top:20px; flex-wrap:wrap;">'
+      + '<button class="btn" onclick="editEntry(' + e.id + ')">✎ 编辑</button>';
+    if (apiOnline) {
+      bodyHTML += '<button class="btn primary" onclick="sendEntryToClaude(' + e.id + ')">↗ 与 Claude 思辨</button>';
+    }
+    bodyHTML += '<button class="close-btn" onclick="closeModal()" style="margin-left:auto;">关闭</button>'
+      + '</div>';
+  }
+
+  document.getElementById('modalContent').innerHTML = bodyHTML;
+  document.getElementById('modalOverlay').style.display = 'flex';
+}
+
+function editEntry(id) {
+  const entries = getEntries();
+  const e = entries.find(en => en.id === id);
+  if (!e) return;
+  document.getElementById('modalOverlay').style.display = 'none';
+  document.getElementById('writeArea').value = e.text;
+  currentPrompt = e.prompt || '';
+  editingId = id;
+  if (currentPrompt) {
+    document.getElementById('promptRef').textContent = '回应：「' + currentPrompt.slice(0, 40) + '…」';
+  }
+  document.getElementById('writeMeta').innerHTML =
+    '<span style="color:var(--accent);">✦ 编辑模式</span>'
+    + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">修改后将更新这颗星辰</span>';
+  document.querySelector('#panel-write .btn.primary').textContent = '✦ 更新星辰';
+  switchPanel('write');
+  updateCharCount();
+  document.getElementById('writeArea').focus();
+  document.getElementById('writeArea').setSelectionRange(e.text.length, e.text.length);
+}
+
+function sendEntryToClaude(id) {
+  const entries = getEntries();
+  const e = entries.find(en => en.id === id);
+  if (!e) return;
+  document.getElementById('modalOverlay').style.display = 'none';
+  // 如果有线程，带上上一次的 prompt；否则用星辰自身的文字
+  document.getElementById('writeArea').value = e.text;
+  currentPrompt = e.prompt || '';
+  editingId = id;  // 标记：回复会追加到这个星辰的线程里
+  updateCharCount();
+  document.getElementById('writeMeta').innerHTML =
+    '<span style="color:var(--accent);">↗ 正在发送给 Claude…</span>';
+  document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存为星辰';
+  switchPanel('write');
+  sendToClaude();
+}
+
+// ═══════════════════════════════════════
+//  DIALOGUE — Send to Claude
+// ═══════════════════════════════════════
+async function sendToClaude() {
+  const text = document.getElementById('writeArea').value.trim();
+  if (!text) { toast('先写点什么吧'); return; }
+
+  const prompt = currentPrompt || '';
+  const btn = document.getElementById('btnSend');
+  const origHTML = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> 思考中…';
+  btn.disabled = true;
+
+  let reply = null;
+  let sent = false;
+
+  // Try server first (with AI reply)
+  if (apiOnline) {
+    try {
+      btn.innerHTML = '<span class="spinner"></span> Claude 正在读你的文字…';
+      const resp = await fetch(`${API_BASE}/api/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, prompt }),
+        signal: AbortSignal.timeout(65000),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        sent = true;
+        if (data.reply) reply = data.reply;
+      }
+    } catch(e) {
+      if (e.name === 'TimeoutError') { sent = true; }
+    }
+  }
+
+  if (!sent) {
+    copyToClipboard(text, prompt);
+  }
+
+  // ── 自动保存为星辰（带对话线程）──
+  const now = new Date().toISOString();
+  const threadMsg = [{ role: 'user', text, date: now }];
+  if (reply) {
+    threadMsg.push({ role: 'claude', text: reply, date: now });
+  }
+
+  const entries = getEntries();
+  if (editingId) {
+    // 追加到已有星辰的线程
+    const idx = entries.findIndex(e => e.id === editingId);
+    if (idx >= 0) {
+      if (!entries[idx].thread) {
+        // 旧条目转线程格式
+        entries[idx].thread = [
+          { role: 'user', text: entries[idx].text, date: entries[idx].date }
+        ];
+      }
+      entries[idx].thread.push(...threadMsg);
+      entries[idx].text = text;
+      entries[idx].editedAt = now;
+    }
+  } else {
+    // 新建星辰
+    entries.unshift({
+      id: Date.now(),
+      text,
+      prompt: prompt || null,
+      date: now,
+      thread: threadMsg,
+    });
+  }
+  localStorage.setItem('sizai_entries', JSON.stringify(entries));
+
+  // 同步到对话面板队列
+  const entryId = addToSentQueue(text, prompt);
+  if (reply) markReplied(entryId, reply);
+
+  clearWrite();
+  initStars();
+  renderDialogue();
+
+  if (reply) {
+    toast('已存为星辰 ✦ Claude 已回复');
+  } else if (sent) {
+    toast('已存为星辰 · 等待 Claude 回复');
+  } else {
+    toast('已存为星辰 · 在电脑上继续对话');
+  }
+
+  btn.innerHTML = origHTML;
+  btn.disabled = false;
+}
+
+async function sendThreadMessage(id) {
+  const input = document.getElementById('threadInput');
+  if (!input) return;
+  const newMsg = input.value.trim();
+  if (!newMsg) { toast('写点什么吧'); return; }
+
+  const entries = getEntries();
+  const idx = entries.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  const entry = entries[idx];
+  if (!entry.thread) {
+    entry.thread = [{ role: 'user', text: entry.text, date: entry.date }];
+  }
+
+  // 把新消息加入线程
+  const now = new Date().toISOString();
+  entry.thread.push({ role: 'user', text: newMsg, date: now });
+  entry.text = newMsg;
+  entry.editedAt = now;
+
+  // 构建完整对话上下文发给 Claude
+  let reply = null;
+  if (apiOnline) {
+    try {
+      const context = entry.thread.map(m =>
+        (m.role === 'user' ? '我：' : 'Claude：') + m.text
+      ).join('\n\n');
+      const resp = await fetch(`${API_BASE}/api/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: '以下是我和你的对话历史，请针对我最后一条消息继续回复：\n\n' + context,
+          prompt: entry.prompt || ''
+        }),
+        signal: AbortSignal.timeout(65000),
+      });
+      const data = await resp.json();
+      if (data.ok && data.reply) reply = data.reply;
+    } catch(e) {}
+  }
+
+  if (reply) {
+    entry.thread.push({ role: 'claude', text: reply, date: new Date().toISOString() });
+  }
+
+  localStorage.setItem('sizai_entries', JSON.stringify(entries));
+  openEntry(id);  // 刷新弹窗
+
+  if (reply) {
+    toast('🌿 Claude 已回复');
+  } else {
+    toast('已发送 · 等待回复');
+  }
+}
+
+function addToSentQueue(text, prompt) {
+  const queue = JSON.parse(localStorage.getItem('sizai_dialogue') || '[]');
+  const entry = {
+    id: Date.now(),
+    text,
+    prompt,
+    date: new Date().toISOString(),
+    replied: false,
+    replyText: null,
+    replyDate: null,
+  };
+  queue.unshift(entry);
+  if (queue.length > 50) queue.length = 50;
+  localStorage.setItem('sizai_dialogue', JSON.stringify(queue));
+  return entry.id;
+}
+
+function markReplied(entryId, replyText) {
+  const queue = JSON.parse(localStorage.getItem('sizai_dialogue') || '[]');
+  const entry = queue.find(e => e.id === entryId);
+  if (entry) {
+    entry.replied = true;
+    entry.replyText = replyText;
+    entry.replyDate = new Date().toISOString();
+    localStorage.setItem('sizai_dialogue', JSON.stringify(queue));
+  }
+}
+
+function copyToClipboard(text, prompt) {
+  let msg = '';
+  if (prompt) {
+    msg += '我在「思·在」回应了这个问题：\n';
+    msg += '> ' + prompt + '\n\n';
+  }
+  msg += text;
+  msg += '\n\n———\n（来自 思·在 哲学思辨花园）';
+
+  navigator.clipboard.writeText(msg).catch(() => {
+    // Fallback: select from a temporary textarea
+    const ta = document.createElement('textarea');
+    ta.value = msg;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+function getSentQueue() {
+  try { return JSON.parse(localStorage.getItem('sizai_dialogue') || '[]'); }
+  catch(e) { return []; }
+}
+
+async function renderDialogue() {
+  const queue = getSentQueue();
+  const empty = document.getElementById('dialogueEmpty');
+  const queueCard = document.getElementById('queueCard');
+  const queueList = document.getElementById('queueList');
+  const inboxCard = document.getElementById('inboxCard');
+  const inboxList = document.getElementById('inboxList');
+  const statusEl = document.getElementById('dialogueStatus');
+
+  if (apiOnline) {
+    statusEl.innerHTML = '<span style="color:rgba(140,220,160,0.8);">●</span> 服务器已连接 · 文字直达 Claude';
+  } else {
+    statusEl.innerHTML = '<span style="color:rgba(200,200,200,0.4);">○</span> 离线模式 · 使用剪贴板发送<br><span style="font-size:0.7rem;">启动服务器: <code style="background:rgba(255,255,255,0.04);padding:2px 6px;border-radius:4px;">cd /Users/a/sizai && python3 server.py</code></span>';
+  }
+
+  // Fetch replies from server to check which items have been replied to
+  let replies = [];
+  if (apiOnline) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/replies`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      replies = await resp.json();
+    } catch(e) {}
+  }
+
+  // Mark items as replied if they match a reply
+  if (replies.length > 0) {
+    let changed = false;
+    queue.forEach(item => {
+      if (!item.replied) {
+        const matched = replies.find(r =>
+          r.reply_to && item.text.includes(r.reply_to.trim().slice(0, 20))
+        );
+        if (matched) {
+          item.replied = true;
+          item.replyText = matched.text;
+          item.replyDate = matched.date;
+          changed = true;
+        }
+      }
+    });
+    if (changed) {
+      localStorage.setItem('sizai_dialogue', JSON.stringify(queue));
+    }
+  }
+
+  if (queue.length === 0) {
+    queueCard.style.display = 'none';
+    inboxCard.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  queueCard.style.display = 'block';
+
+  queueList.innerHTML = queue.map((item, i) => {
+    const date = new Date(item.date);
+    const dateStr = date.toLocaleDateString('zh-CN', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const preview = item.text.slice(0, 80);
+
+    let replyBlock = '';
+    if (item.replied && item.replyText) {
+      replyBlock = `
+        <div style="margin-top:10px; padding:10px 14px; background:rgba(100,180,140,0.06); border-left:2px solid rgba(140,220,160,0.3); border-radius:4px;">
+          <div style="font-size:0.65rem; color:rgba(140,220,160,0.5); margin-bottom:4px;">↩ Claude 的回复</div>
+          <div style="font-size:0.82rem; color:rgba(200,220,210,0.85); line-height:1.6;">${escapeHtml(item.replyText.slice(0, 200))}</div>
+        </div>`;
+    }
+
+    const repliedBadge = item.replied
+      ? '<span style="color:rgba(140,220,160,0.6); font-size:0.65rem;">✓ Claude 已回复</span>'
+      : '<span style="color:var(--accent); font-size:0.65rem;">⏳ 等待 Claude…</span>';
+
+    return `
+      <div style="padding:14px 0; border-bottom:1px solid var(--border); ${i === 0 ? 'border-top:1px solid var(--border);' : ''}">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:0.7rem; color:rgba(200,200,220,0.35);">${dateStr}</span>
+          ${repliedBadge}
+        </div>
+        ${item.prompt ? '<div style="font-size:0.75rem; color:var(--accent); font-style:italic; margin-bottom:4px;">「' + escapeHtml(item.prompt.slice(0, 60)) + '」</div>' : ''}
+        <div style="font-size:0.85rem; color:var(--text); line-height:1.5;">${escapeHtml(preview)}…</div>
+        ${replyBlock}
+      </div>
+    `;
+  }).join('');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').style.display = 'none';
+}
+
+// ═══════════════════════════════════════
+//  MUSIC
+// ═══════════════════════════════════════
+function getMusicEntries() {
+  try { return JSON.parse(localStorage.getItem('sizai_music')) || []; }
+  catch(e) { return []; }
+}
+
+function saveMusic() {
+  const name = document.getElementById('songName').value.trim();
+  const artist = document.getElementById('artistName').value.trim();
+  const feeling = document.getElementById('musicFeeling').value.trim();
+  if (!name) { toast('至少填一下歌名吧'); return; }
+
+  const entries = getMusicEntries();
+  entries.unshift({
+    id: Date.now(),
+    name, artist: artist || '未知', feeling,
+    date: new Date().toISOString(),
+  });
+  localStorage.setItem('sizai_music', JSON.stringify(entries));
+  document.getElementById('songName').value = '';
+  document.getElementById('artistName').value = '';
+  document.getElementById('musicFeeling').value = '';
+  renderMusic();
+  toast('♫ 已记录');
+}
+
+function deleteMusic(id) {
+  let entries = getMusicEntries();
+  entries = entries.filter(e => e.id !== id);
+  localStorage.setItem('sizai_music', JSON.stringify(entries));
+  renderMusic();
+}
+
+function renderMusic() {
+  const entries = getMusicEntries();
+  const list = document.getElementById('musicList');
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="empty-state" style="padding:30px;">还没有记录音乐。<br>听到触动你的歌时，来这里记下。</div>';
+    return;
+  }
+  list.innerHTML = entries.map(e => {
+    const date = new Date(e.date).toLocaleDateString('zh-CN', {
+      month: 'short', day: 'numeric'
+    });
+    return `
+      <div class="music-entry">
+        <div class="album-art">♪</div>
+        <div class="info">
+          <div class="song-name">${escapeHtml(e.name)}</div>
+          <div class="artist">${escapeHtml(e.artist)}</div>
+          ${e.feeling ? '<div class="feeling">' + escapeHtml(e.feeling) + '</div>' : ''}
+          <div class="m-date">${date} · <a href="#" onclick="deleteMusic(${e.id});return false;" style="color:inherit;">删除</a></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function toast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2200);
+}
+
+// Position the global tooltip near a star element
+function positionTooltip(tooltip, star) {
+  const starRect = star.getBoundingClientRect();
+  const ttRect = tooltip.getBoundingClientRect();
+  const gap = 20;
+
+  // Place above the star by default
+  let top = starRect.top - ttRect.height - gap;
+  let left = starRect.left + starRect.width / 2 - ttRect.width / 2;
+
+  // If too close to top edge, place below
+  if (top < 10) {
+    top = starRect.bottom + gap;
+  }
+
+  // Keep within horizontal viewport
+  if (left < 10) left = 10;
+  if (left + ttRect.width > window.innerWidth - 10) {
+    left = window.innerWidth - ttRect.width - 10;
+  }
+
+  tooltip.style.left = left + 'px';
+  tooltip.style.top = top + 'px';
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+displayQuestion();
+renderGarden();
+renderMusic();
+updateCharCount();
+checkAPIStatus();
+
+// Keyboard shortcuts
+document.getElementById('writeArea').addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    saveEntry();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('modalOverlay').style.display = 'none';
+  }
+});
+
+console.log('%c 思·在  %c—— 哲学思辨花园',
+  'font-size:1.2em; color:#d4a854;', 'color:#888;');
+console.log('%c' + QUESTION_BANK.length + ' 个哲学问题已就绪  |  支持 AI 实时生成',
+  'color:#666; font-style:italic;');
+console.log('%c你的每一段文字，都会变成一颗星。',
+  'color:#555;');
+
+// Register Service Worker (PWA)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
