@@ -250,110 +250,62 @@
   }
   .char-count { margin-left: auto; }
 
-  /* ── Constellation / Garden ── */
-  .constellation-container {
-    position: relative;
-    width: 100%;
-    min-height: 520px;
-    border-radius: var(--radius);
-    background: rgba(8,8,18,0.5);
+  /* ── Garden / Card List ── */
+  .garden-list {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .garden-card {
+    background: var(--surface);
     border: 1px solid var(--border);
-    cursor: default;
-  }
-  .constellation-canvas {
-    position: absolute; top:0; left:0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 0;
-  }
-  .entry-star {
-    position: absolute;
-    z-index: 1;
+    border-radius: var(--radius);
+    padding: 18px 20px;
     cursor: pointer;
-    /* Large invisible hit area so hover doesn't flicker */
-    width: 80px; height: 80px;
-    margin-left: -40px; margin-top: -40px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    transition: filter 0.3s ease;
+    transition: all 0.25s ease;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
-  .entry-star:hover {
-    filter: brightness(1.6);
-    z-index: 10;
+  .garden-card:hover {
+    border-color: rgba(212,168,84,0.3);
+    box-shadow: 0 0 20px rgba(212,168,84,0.06);
   }
-  .entry-star.show-tooltip {
-    filter: brightness(1.6);
-    z-index: 10;
-  }
-  .entry-star .star-core {
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #f0d080 0%, #d4a854 40%, rgba(212,168,84,0.2) 70%, transparent 100%);
-    box-shadow: 0 0 16px rgba(212,168,84,0.6), 0 0 40px rgba(212,168,84,0.2), 0 0 80px rgba(212,168,84,0.08);
-    flex-shrink: 0;
-    position: relative;
-    pointer-events: none;
-  }
-  .entry-star.large .star-core {
-    width: 22px; height: 22px;
-    box-shadow: 0 0 24px rgba(212,168,84,0.8), 0 0 56px rgba(212,168,84,0.3), 0 0 100px rgba(212,168,84,0.12);
-  }
-  .entry-star.small .star-core {
-    width: 10px; height: 10px;
-    box-shadow: 0 0 10px rgba(212,168,84,0.4), 0 0 24px rgba(212,168,84,0.12);
-  }
-  .entry-star .star-halo {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    border: 1px solid rgba(212,168,84,0.12);
-    pointer-events: none;
-    animation: haloPulse 3s ease-in-out infinite;
-  }
-  .entry-star.large .star-halo { width: 56px; height: 56px; }
-  .entry-star.small .star-halo { width: 28px; height: 28px; }
-  @keyframes haloPulse {
-    0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
-    50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.5); }
-  }
-  .entry-star .star-label {
-    text-align: center;
-    margin-top: 8px;
-    font-size: 0.65rem;
-    color: rgba(200,200,220,0.4);
+  .garden-card .gc-date {
+    font-size: 0.7rem;
+    color: rgba(200,200,220,0.35);
     letter-spacing: 0.04em;
-    white-space: nowrap;
-    transition: color 0.3s;
-    pointer-events: none;
+    margin-bottom: 6px;
   }
-  .entry-star.show-tooltip .star-label {
-    color: rgba(212,168,84,0.9);
+  .garden-card .gc-prompt {
+    font-size: 0.82rem;
+    color: var(--accent);
+    font-style: italic;
+    margin-bottom: 8px;
+    line-height: 1.5;
   }
-  .entry-star.show-tooltip .delete-star {
-    display: block;
+  .garden-card .gc-preview {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  .entry-star .delete-star {
-    display: none;
-    position: absolute;
-    top: -6px; right: -6px;
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    background: rgba(30,30,50,0.9);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(200,200,220,0.5);
-    font-size: 0.6rem;
+  .garden-card .gc-meta {
+    display: flex; gap: 12px; align-items: center;
+    margin-top: 10px;
+    font-size: 0.7rem;
+    color: rgba(200,200,220,0.3);
+  }
+  .garden-card .gc-delete {
+    font-size: 0.7rem;
+    color: rgba(200,200,220,0.2);
     cursor: pointer;
-    line-height: 16px;
-    text-align: center;
-    z-index: 15;
+    margin-left: auto;
+    text-decoration: none;
+    transition: color 0.2s;
   }
-  .entry-star .delete-star:hover {
+  .garden-card .gc-delete:hover {
     color: #e06060;
-    border-color: rgba(224,96,96,0.4);
   }
 
   .empty-state {
@@ -412,49 +364,6 @@
     font-family:var(--font-cn);
   }
 
-  /* ── Global Tooltip (detached from star DOM, no flicker) ── */
-  .global-tooltip {
-    position: fixed;
-    pointer-events: none;
-    z-index: 200;
-    background: rgba(20,18,35,0.96);
-    border: 1px solid rgba(212,168,84,0.25);
-    border-radius: 12px;
-    padding: 12px 16px;
-    width: 260px;
-    text-align: center;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.18s ease, visibility 0.18s ease;
-  }
-  .global-tooltip.visible {
-    opacity: 1;
-    visibility: visible;
-  }
-  .global-tooltip .t-date {
-    font-size: 0.65rem;
-    color: rgba(200,200,220,0.4);
-    letter-spacing: 0.06em;
-    margin-bottom: 6px;
-  }
-  .global-tooltip .t-question {
-    font-family: var(--font-cn);
-    font-size: 0.82rem;
-    color: var(--accent);
-    line-height: 1.5;
-    font-style: italic;
-  }
-  .global-tooltip .t-preview {
-    font-family: var(--font-cn);
-    font-size: 0.75rem;
-    color: rgba(200,200,220,0.6);
-    line-height: 1.5;
-    margin-top: 4px;
-  }
-
   .spinner {
     display: inline-block;
     width: 14px; height: 14px;
@@ -471,7 +380,6 @@
     #app { padding: 16px 12px 60px; }
     .card { padding: 20px 16px; }
     nav button { font-size: 0.75rem; padding: 8px 10px; }
-    .constellation-container { min-height: 380px; }
   }
 </style>
 <link rel="manifest" href="manifest.json">
@@ -497,7 +405,6 @@
     <button data-panel="question" class="active">🜁 每日一问</button>
     <button data-panel="write">✎ 书写</button>
     <button data-panel="garden">✦ 思之星辰</button>
-    <button data-panel="dialogue">↗ 对话</button>
   </nav>
 
   <!-- QUESTION PANEL -->
@@ -538,43 +445,9 @@
 
   <!-- GARDEN PANEL — Constellation -->
   <section class="panel" id="panel-garden">
-    <div class="constellation-container" id="constellation">
-      <canvas class="constellation-canvas" id="constellationCanvas"></canvas>
-    </div>
+    <div class="garden-list" id="gardenList"></div>
     <div class="empty-state" id="gardenEmpty">
       还没有文字。<br>去「书写」那里留下你的第一个想法吧。
-    </div>
-  </section>
-
-  <!-- DIALOGUE PANEL -->
-  <section class="panel" id="panel-dialogue">
-    <div class="card" style="text-align:center; padding: 32px 20px;">
-      <p style="font-family:var(--font-cn); color:var(--text-bright); font-size:1.05rem; line-height:1.8;">
-        把你的思辨文字<br>发送给 <span style="color:var(--accent);">Claude</span>，一起探讨。
-      </p>
-      <p style="font-size:0.8rem; color:rgba(200,200,220,0.4); margin-top:12px; line-height:1.6;" id="dialogueStatus">
-        服务器未连接 · 将使用剪贴板模式
-      </p>
-    </div>
-
-    <!-- Unsent queue -->
-    <div class="card" id="queueCard" style="display:none;">
-      <div style="font-size:0.8rem; color:var(--accent); margin-bottom:12px; letter-spacing:0.06em;">
-        ⬡ 待发送的思辨
-      </div>
-      <div id="queueList"></div>
-    </div>
-
-    <!-- Inbox preview (when server connected) -->
-    <div class="card" id="inboxCard" style="display:none;">
-      <div style="font-size:0.8rem; color:rgba(200,200,220,0.5); margin-bottom:12px; letter-spacing:0.06em;">
-        ↖ 已发送的思辨
-      </div>
-      <div id="inboxList"></div>
-    </div>
-
-    <div class="empty-state" id="dialogueEmpty">
-      还没有发送过思辨文字。<br>去「书写」那里，写下你的想法，<br>然后点击「与 Claude 思辨」。
     </div>
   </section>
 
@@ -583,12 +456,6 @@
     <div class="modal" id="modalContent"></div>
   </div>
 
-  <!-- GLOBAL TOOLTIP for constellation stars (detached from star DOM) -->
-  <div class="global-tooltip" id="globalTooltip">
-    <div class="t-date" id="gtDate"></div>
-    <div class="t-question" id="gtQuestion"></div>
-    <div class="t-preview" id="gtPreview"></div>
-  </div>
 </div>
 
 <script>
@@ -1020,7 +887,6 @@ async function checkAPIStatus() {
       document.getElementById('apiStatus').textContent = hasKey ? 'AI 实时生成 · 已连接' : '服务器已连接 · 本地题库';
       document.getElementById('apiStatus').className = 'api-status online';
       document.getElementById('btnAI').style.display = hasKey ? '' : '';
-      updateDialogueStatus();
       return;
     }
   } catch(e) {}
@@ -1028,17 +894,6 @@ async function checkAPIStatus() {
   document.getElementById('apiStatus').textContent = '本地题库 · 170+ 问题';
   document.getElementById('apiStatus').className = 'api-status offline';
   document.getElementById('btnAI').style.display = '';
-  updateDialogueStatus();
-}
-
-function updateDialogueStatus() {
-  const el = document.getElementById('dialogueStatus');
-  if (!el) return;
-  if (apiOnline) {
-    el.innerHTML = '<span style="color:rgba(140,220,160,0.8);">●</span> 服务器已连接 · 文字直达 Claude';
-  } else {
-    el.innerHTML = '<span style="color:rgba(200,200,200,0.4);">○</span> 离线模式 · 剪贴板发送<br><span style="font-size:0.7rem;">启动直达: <code style="background:rgba(255,255,255,0.04);padding:2px 6px;border-radius:4px;">cd /Users/a/sizai && python3 server.py</code></span>';
-  }
 }
 
 // ═══════════════════════════════════════
@@ -1052,7 +907,6 @@ document.querySelectorAll('nav button').forEach(btn => {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + panelName).classList.add('active');
     if (panelName === 'garden') renderGarden();
-    if (panelName === 'dialogue') renderDialogue();
     if (panelName === 'question' && currentQuestion) displayQuestion(currentQuestion);
   });
 });
@@ -1148,150 +1002,45 @@ function deleteEntry(id) {
 
 function renderGarden() {
   const entries = getEntries();
-  const container = document.getElementById('constellation');
-  const canvas = document.getElementById('constellationCanvas');
+  const list = document.getElementById('gardenList');
   const empty = document.getElementById('gardenEmpty');
 
-  // Remove old star elements
-  container.querySelectorAll('.entry-star').forEach(el => el.remove());
-
   if (entries.length === 0) {
-    container.style.display = 'none';
+    list.style.display = 'none';
     empty.style.display = 'block';
     return;
   }
-  container.style.display = 'block';
+  list.style.display = 'flex';
   empty.style.display = 'none';
 
-  // Sort oldest → newest
-  const sorted = [...entries].reverse();
+  const sorted = [...entries].reverse(); // oldest → newest
 
-  // ── Layout algorithm: timeline constellation ──
-  const pad = 50; // padding from edges
-  const w = container.clientWidth;
-  const h = container.clientHeight || 520;
-
-  // Resize canvas
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-
-  // Calculate positions
-  const points = sorted.map((e, i) => {
-    const t = sorted.length === 1 ? 0.5 : i / (sorted.length - 1);
-    // x: left → right (old → new)
-    const x = pad + t * (w - pad * 2);
-    // y: organic wave pattern, with time-of-day influence
+  list.innerHTML = sorted.map((e, i) => {
     const d = new Date(e.date);
-    const hourFrac = d.getHours() / 24;
-    const wave = Math.sin(t * Math.PI * 2.5 + i * 0.7) * (h * 0.18);
-    const timeBias = (hourFrac - 0.5) * (h * 0.25);
-    const y = h / 2 + wave + timeBias;
-    // Clamp to container
-    const cy = Math.max(pad, Math.min(h - pad, y));
-
-    // Size by entry length
-    const len = e.text.length;
-    let sizeClass = '';
-    if (len > 800) sizeClass = 'large';
-    else if (len < 150) sizeClass = 'small';
-
-    return { x, y: cy, entry: e, sizeClass };
-  });
-
-  // ── Draw constellation lines ──
-  ctx.clearRect(0, 0, w, h);
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i];
-    const b = points[i + 1];
-    const alpha = 0.12 + 0.08 * (i / points.length);
-    ctx.strokeStyle = `rgba(212,168,84,${alpha})`;
-    ctx.lineWidth = 0.6;
-    ctx.setLineDash([3, 6]);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    // Gentle curve connecting stars
-    const mx = (a.x + b.x) / 2;
-    const my = (a.y + b.y) / 2 - 15;
-    ctx.quadraticCurveTo(mx, my, b.x, b.y);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-
-  // Draw subtle background grid stars
-  for (let i = 0; i < 40; i++) {
-    const bx = Math.random() * w;
-    const by = Math.random() * h;
-    const br = Math.random() * 0.8 + 0.2;
-    ctx.fillStyle = `rgba(200,210,240,${Math.random() * 0.2 + 0.05})`;
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ── Create star DOM elements ──
-  const fragment = document.createDocumentFragment();
-  points.forEach((p) => {
-    const e = p.entry;
-    const date = new Date(e.date);
-    const dateStr = date.toLocaleDateString('zh-CN', {
-      month: 'short', day: 'numeric'
-    });
-    const timeStr = date.toLocaleTimeString('zh-CN', {
-      hour: '2-digit', minute: '2-digit'
-    });
-    const fullDateStr = date.toLocaleDateString('zh-CN', {
+    const dateStr = d.toLocaleDateString('zh-CN', {
       year: 'numeric', month: 'long', day: 'numeric'
     });
-    const preview = e.text.slice(0, 60);
-
-    const star = document.createElement('div');
-    star.className = 'entry-star ' + p.sizeClass;
-    star.style.left = p.x + 'px';
-    star.style.top = p.y + 'px';
-    star.onclick = () => openStarInWriter(e.id);
-
-    // Stable tooltip via global detached element (no DOM nesting flicker)
-    let hideTimer;
-    star.addEventListener('mouseenter', (ev) => {
-      clearTimeout(hideTimer);
-      star.classList.add('show-tooltip');
-      // Populate and position global tooltip
-      const gt = document.getElementById('globalTooltip');
-      document.getElementById('gtDate').textContent = fullDateStr + ' · ' + timeStr;
-      document.getElementById('gtQuestion').innerHTML = e.prompt
-        ? '「' + escapeHtml(e.prompt.slice(0, 80)) + '」'
-        : '';
-      document.getElementById('gtPreview').textContent = preview ? preview + '…' : '';
-      gt.classList.add('visible');
-      positionTooltip(gt, star);
+    const timeStr = d.toLocaleTimeString('zh-CN', {
+      hour: '2-digit', minute: '2-digit'
     });
-    star.addEventListener('mouseleave', () => {
-      hideTimer = setTimeout(() => {
-        star.classList.remove('show-tooltip');
-        document.getElementById('globalTooltip').classList.remove('visible');
-      }, 150);
-    });
+    const threadInfo = e.thread && e.thread.length > 0
+      ? '<span style="color:rgba(140,200,160,0.5);">💬 ' + Math.floor(e.thread.length / 2) + ' 轮对话</span>'
+      : '';
+    const editedMark = e.editedAt
+      ? '<span style="color:rgba(200,200,220,0.2);">（已编辑）</span>'
+      : '';
 
-    star.innerHTML = `
-      <div class="star-core"></div>
-      <div class="star-halo"></div>
-      <button class="delete-star" onclick="event.stopPropagation();deleteEntry(${e.id})">×</button>
-      <div class="star-label">${dateStr}</div>
-    `;
-    fragment.appendChild(star);
-  });
-  container.appendChild(fragment);
-
-  // ── Observe resize (debounced to prevent loops) ──
-  if (container._ro) container._ro.disconnect();
-  let resizeTimer;
-  const ro = new ResizeObserver(() => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => renderGarden(), 150);
-  });
-  ro.observe(container);
-  container._ro = ro;
+    return '<div class="garden-card" onclick="openStarInWriter(' + e.id + ')">'
+      + '<div class="gc-date">' + dateStr + ' · ' + timeStr + '</div>'
+      + (e.prompt ? '<div class="gc-prompt">「' + escapeHtml(e.prompt.slice(0, 100)) + '」</div>' : '')
+      + '<div class="gc-preview">' + escapeHtml(e.text) + '</div>'
+      + '<div class="gc-meta">'
+      + threadInfo
+      + editedMark
+      + '<a href="#" class="gc-delete" onclick="event.stopPropagation();deleteEntry(' + e.id + ');return false;">删除</a>'
+      + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 function openEntry(id) {
@@ -1376,12 +1125,16 @@ function openStarInWriter(id) {
   if (e.thread && e.thread.length > 0) {
     // ── 有对话线程：显示历史，清空输入区 ──
     tp.style.display = 'block';
-    tp.innerHTML = e.thread.map(msg => {
+    tp.innerHTML = e.thread.map((msg, i) => {
       const isUser = msg.role === 'user';
       const roleColor = isUser ? 'var(--accent)' : 'rgba(140,200,160,0.7)';
       const label = isUser ? '💭 你' : '🌿 Claude';
-      const preview = msg.text.length > 150 ? msg.text.slice(0, 150) + '…' : msg.text;
-      return '<div class="tp-msg"><div class="tp-role" style="color:' + roleColor + '">' + label + '</div>' + escapeHtml(preview) + '</div>';
+      const cid = 'tpc-' + i;
+      return '<div class="tp-msg">'
+        + '<div class="tp-role" style="color:' + roleColor + '">' + label + '</div>'
+        + '<div class="tp-content" id="' + cid + '" style="max-height:4.5em;overflow:hidden;">' + escapeHtml(msg.text) + '</div>'
+        + '<a href="#" class="tp-expand" onclick="toggleTPMsg(\'' + cid + '\',this);return false;" style="font-size:0.65rem;color:var(--accent);">展开</a>'
+        + '</div>';
     }).join('');
     document.getElementById('writeArea').value = '';
     document.getElementById('writeArea').placeholder = '继续这段对话…';
@@ -1442,7 +1195,7 @@ function sendEntryToClaude(id) {
 }
 
 // ═══════════════════════════════════════
-//  DIALOGUE — Send to Claude
+//  SEND TO CLAUDE
 // ═══════════════════════════════════════
 async function sendToClaude() {
   const text = document.getElementById('writeArea').value.trim();
@@ -1525,12 +1278,8 @@ async function sendToClaude() {
   }
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
 
-  const entryId = addToSentQueue(text, prompt);
-  if (reply) markReplied(entryId, reply);
-
   clearWrite();
   initStars();
-  renderDialogue();
 
   if (reply) {
     toast('已追加到星辰 ✦ Claude 已回复');
@@ -1599,34 +1348,6 @@ async function sendThreadMessage(id) {
   }
 }
 
-function addToSentQueue(text, prompt) {
-  const queue = JSON.parse(localStorage.getItem('sizai_dialogue') || '[]');
-  const entry = {
-    id: Date.now(),
-    text,
-    prompt,
-    date: new Date().toISOString(),
-    replied: false,
-    replyText: null,
-    replyDate: null,
-  };
-  queue.unshift(entry);
-  if (queue.length > 50) queue.length = 50;
-  localStorage.setItem('sizai_dialogue', JSON.stringify(queue));
-  return entry.id;
-}
-
-function markReplied(entryId, replyText) {
-  const queue = JSON.parse(localStorage.getItem('sizai_dialogue') || '[]');
-  const entry = queue.find(e => e.id === entryId);
-  if (entry) {
-    entry.replied = true;
-    entry.replyText = replyText;
-    entry.replyDate = new Date().toISOString();
-    localStorage.setItem('sizai_dialogue', JSON.stringify(queue));
-  }
-}
-
 function copyToClipboard(text, prompt) {
   let msg = '';
   if (prompt) {
@@ -1648,102 +1369,6 @@ function copyToClipboard(text, prompt) {
   });
 }
 
-function getSentQueue() {
-  try { return JSON.parse(localStorage.getItem('sizai_dialogue') || '[]'); }
-  catch(e) { return []; }
-}
-
-async function renderDialogue() {
-  const queue = getSentQueue();
-  const empty = document.getElementById('dialogueEmpty');
-  const queueCard = document.getElementById('queueCard');
-  const queueList = document.getElementById('queueList');
-  const inboxCard = document.getElementById('inboxCard');
-  const inboxList = document.getElementById('inboxList');
-  const statusEl = document.getElementById('dialogueStatus');
-
-  if (apiOnline) {
-    statusEl.innerHTML = '<span style="color:rgba(140,220,160,0.8);">●</span> 服务器已连接 · 文字直达 Claude';
-  } else {
-    statusEl.innerHTML = '<span style="color:rgba(200,200,200,0.4);">○</span> 离线模式 · 使用剪贴板发送<br><span style="font-size:0.7rem;">启动服务器: <code style="background:rgba(255,255,255,0.04);padding:2px 6px;border-radius:4px;">cd /Users/a/sizai && python3 server.py</code></span>';
-  }
-
-  // Fetch replies from server to check which items have been replied to
-  let replies = [];
-  if (apiOnline) {
-    try {
-      const resp = await fetch(`${API_BASE}/api/replies`, {
-        signal: AbortSignal.timeout(3000)
-      });
-      replies = await resp.json();
-    } catch(e) {}
-  }
-
-  // Mark items as replied if they match a reply
-  if (replies.length > 0) {
-    let changed = false;
-    queue.forEach(item => {
-      if (!item.replied) {
-        const matched = replies.find(r =>
-          r.reply_to && item.text.includes(r.reply_to.trim().slice(0, 20))
-        );
-        if (matched) {
-          item.replied = true;
-          item.replyText = matched.text;
-          item.replyDate = matched.date;
-          changed = true;
-        }
-      }
-    });
-    if (changed) {
-      localStorage.setItem('sizai_dialogue', JSON.stringify(queue));
-    }
-  }
-
-  if (queue.length === 0) {
-    queueCard.style.display = 'none';
-    inboxCard.style.display = 'none';
-    empty.style.display = 'block';
-    return;
-  }
-
-  empty.style.display = 'none';
-  queueCard.style.display = 'block';
-
-  queueList.innerHTML = queue.map((item, i) => {
-    const date = new Date(item.date);
-    const dateStr = date.toLocaleDateString('zh-CN', {
-      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-    const preview = item.text.slice(0, 80);
-
-    let replyBlock = '';
-    if (item.replied && item.replyText) {
-      replyBlock = `
-        <div style="margin-top:10px; padding:10px 14px; background:rgba(100,180,140,0.06); border-left:2px solid rgba(140,220,160,0.3); border-radius:4px;">
-          <div style="font-size:0.65rem; color:rgba(140,220,160,0.5); margin-bottom:4px;">↩ Claude 的回复</div>
-          <div style="font-size:0.82rem; color:rgba(200,220,210,0.85); line-height:1.6;">${escapeHtml(item.replyText.slice(0, 200))}</div>
-        </div>`;
-    }
-
-    const repliedBadge = item.replied
-      ? '<span style="color:rgba(140,220,160,0.6); font-size:0.65rem;">✓ Claude 已回复</span>'
-      : '<span style="color:var(--accent); font-size:0.65rem;">⏳ 等待 Claude…</span>';
-
-    return `
-      <div style="padding:14px 0; border-bottom:1px solid var(--border); ${i === 0 ? 'border-top:1px solid var(--border);' : ''}">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span style="font-size:0.7rem; color:rgba(200,200,220,0.35);">${dateStr}</span>
-          ${repliedBadge}
-        </div>
-        ${item.prompt ? '<div style="font-size:0.75rem; color:var(--accent); font-style:italic; margin-bottom:4px;">「' + escapeHtml(item.prompt.slice(0, 60)) + '」</div>' : ''}
-        <div style="font-size:0.85rem; color:var(--text); line-height:1.5;">${escapeHtml(preview)}…</div>
-        ${replyBlock}
-      </div>
-    `;
-  }).join('');
-}
-
 function closeModal(e) {
   if (e && e.target !== document.getElementById('modalOverlay')) return;
   document.getElementById('modalOverlay').style.display = 'none';
@@ -1758,6 +1383,18 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+function toggleTPMsg(id, link) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.style.maxHeight === 'none') {
+    el.style.maxHeight = '4.5em';
+    link.textContent = '展开';
+  } else {
+    el.style.maxHeight = 'none';
+    link.textContent = '收起';
+  }
+}
+
 function toast(msg) {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();
@@ -1766,31 +1403,6 @@ function toast(msg) {
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2200);
-}
-
-// Position the global tooltip near a star element
-function positionTooltip(tooltip, star) {
-  const starRect = star.getBoundingClientRect();
-  const ttRect = tooltip.getBoundingClientRect();
-  const gap = 20;
-
-  // Place above the star by default
-  let top = starRect.top - ttRect.height - gap;
-  let left = starRect.left + starRect.width / 2 - ttRect.width / 2;
-
-  // If too close to top edge, place below
-  if (top < 10) {
-    top = starRect.bottom + gap;
-  }
-
-  // Keep within horizontal viewport
-  if (left < 10) left = 10;
-  if (left + ttRect.width > window.innerWidth - 10) {
-    left = window.innerWidth - ttRect.width - 10;
-  }
-
-  tooltip.style.left = left + 'px';
-  tooltip.style.top = top + 'px';
 }
 
 // ═══════════════════════════════════════

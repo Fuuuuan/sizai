@@ -7,6 +7,7 @@
 
 import json
 import os
+import subprocess
 import urllib.request
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -15,6 +16,7 @@ API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 API_URL = "https://api.anthropic.com/v1/messages"
 INBOX_FILE = os.path.join(os.path.dirname(__file__), "inbox.md")
 REPLIES_FILE = os.path.join(os.path.dirname(__file__), "replies.json")
+CLAUDE_CLI = os.path.expanduser("~/.local/bin/claude")
 
 REPLY_SYSTEM_PROMPT = """你是一位哲学对话伙伴，用户在「思·在」思辨花园里写下了他们的思考。
 你的任务是用中文给用户一个真诚、有深度的回复。
@@ -141,41 +143,35 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"ok": True, "chars": len(text), "reply_fallback": True})
 
     def generate_reply(self, text, prompt):
-        """Use Anthropic API directly to generate a philosophical reply."""
-        if not API_KEY:
-            print("  ⚠ 未设置 API key，跳过 AI 回复")
+        """Use Claude Code CLI (deepseek-v4-pro) to generate a philosophical reply."""
+        if not os.path.exists(CLAUDE_CLI):
+            print("  ⚠ claude CLI 未找到，跳过 AI 回复")
             return None
 
-        user_content = "用户写下了以下思辨文字：\n\n"
+        user_prompt = "用户写下了以下思辨文字：\n\n"
         if prompt:
-            user_content += f"（用户在回应这个问题：「{prompt}」）\n\n"
-        user_content += text
-
-        body = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 600,
-            "system": REPLY_SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": user_content}],
-        }).encode("utf-8")
+            user_prompt += f"（用户在回应这个问题：「{prompt}」）\n\n"
+        user_prompt += f"{text}\n\n"
+        user_prompt += "请给用户一个真诚的哲学对话回复。"
 
         try:
-            print("  → 正在生成 AI 回复…")
-            req = urllib.request.Request(API_URL, data=body, headers={
-                "x-api-key": API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            })
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            reply = data["content"][0]["text"].strip()
+            print("  → 正在用 Claude Code 生成 AI 回复…")
+            result = subprocess.run(
+                [CLAUDE_CLI, "-p", user_prompt, "--output-format", "text"],
+                capture_output=True, text=True, timeout=60,
+                env={**os.environ, "CLAUDE_CODE_SYSTEM_PROMPT": REPLY_SYSTEM_PROMPT},
+            )
+            reply = result.stdout.strip()
             if reply:
                 self.save_reply(text[:30], reply)
                 print(f"  ✓ AI 回复已生成 ({len(reply)} 字)")
                 return reply
             else:
-                print("  ⚠ AI 回复为空")
+                print(f"  ⚠ AI 回复为空 (stderr: {result.stderr[:100]})")
                 return None
+        except subprocess.TimeoutExpired:
+            print("  ⚠ AI 回复超时")
+            return None
         except Exception as e:
             print(f"  ⚠ AI 回复失败: {e}")
             return None
