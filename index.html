@@ -670,6 +670,7 @@ const savedLang = localStorage.getItem('sizai_lang');
 if(savedLang && (savedLang==='zh' || savedLang==='en')) L = savedLang;
 document.getElementById('btnZh').className = L==='zh'?'active-lang':'';
 document.getElementById('btnEn').className = L==='en'?'active-lang':'';
+setTimeout(() => refreshUI(), 100); // 等 DOM 就绪后刷新 UI
 
 // ═══════════════════════════════════════
 //  CONFIGURATION
@@ -983,11 +984,21 @@ function getDailyQuestion() {
       if (data.date === today && data.q) return data;
     } catch(e) {}
   }
-  // Deterministic daily pick from the bank
+  // Pick: avoid recently used daily questions
+  const used = JSON.parse(localStorage.getItem('sizai_daily_history') || '[]');
+  let available = QUESTION_BANK.map((q, i) => i).filter(i => !used.includes(i));
+  if (available.length === 0) {
+    available = QUESTION_BANK.map((_, i) => i); // all used, reset
+    used.length = 0;
+  }
   const seed = getDailySeed();
-  const idx = seed % QUESTION_BANK.length;
+  const idx = available[seed % available.length];
   const picked = { date: today, index: idx, ...QUESTION_BANK[idx], source: 'bank' };
   localStorage.setItem('sizai_daily', JSON.stringify(picked));
+  // Track used questions
+  used.push(idx);
+  if (used.length > 90) used.shift(); // keep last 90 days
+  localStorage.setItem('sizai_daily_history', JSON.stringify(used));
   return picked;
 }
 
