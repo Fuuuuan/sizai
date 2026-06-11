@@ -731,6 +731,12 @@ setTimeout(() => refreshUI(), 100); // 等 DOM 就绪后刷新 UI
 //  CONFIGURATION
 // ═══════════════════════════════════════
 const API_BASE = 'http://localhost:8899';
+let needsAuth = false;
+let accessCode = localStorage.getItem('sizai_access_code') || '';
+// 授权码：加在所有 AI 请求的 header 上
+function authHeaders() {
+  return accessCode ? { 'X-Sizai-Auth': accessCode } : {};
+}
 
 // ═══════════════════════════════════════
 //  STARFIELD
@@ -1153,8 +1159,22 @@ async function fetchAIQuestion() {
   btn.innerHTML = origText;
 }
 
+function showAuthPrompt() {
+  const isZh = L === 'zh';
+  const code = prompt(
+    isZh ? '此服务器需要授权码才能使用 AI 功能。\n请输入授权码：' : 'This server requires an access code for AI features.\nEnter access code:'
+  );
+  if (code && code.trim()) {
+    accessCode = code.trim();
+    localStorage.setItem('sizai_access_code', accessCode);
+    toast(isZh ? '授权码已保存 ✓' : 'Access code saved ✓');
+    refreshUI();
+  }
+}
+
 async function fetchFromAPI() {
   const resp = await fetch(`${API_BASE}/api/question`, {
+    headers: authHeaders(),
     signal: AbortSignal.timeout(8000)
   });
   if (!resp.ok) throw new Error('API error');
@@ -1171,14 +1191,17 @@ async function checkAPIStatus() {
     const data = await resp.json();
     if (data.ok) {
       apiOnline = true;
+      needsAuth = data.needs_auth || false;
       const hasKey = data.has_api_key;
       document.getElementById('apiStatus').textContent = hasKey ? t('status_online') : t('status_server');
       document.getElementById('apiStatus').className = 'api-status online';
       document.getElementById('btnAI').style.display = hasKey ? '' : '';
+      if (needsAuth && !accessCode) showAuthPrompt();
       return;
     }
   } catch(e) {}
   apiOnline = false;
+  needsAuth = false;
   document.getElementById('apiStatus').textContent = t('status_local') + ' · 170+';
   document.getElementById('apiStatus').className = 'api-status offline';
   document.getElementById('btnAI').style.display = '';
@@ -1561,7 +1584,7 @@ async function sendToClaude() {
       btn.innerHTML = '<span class="spinner"></span> ' + t('spinner_reading');
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ text: apiText, prompt }),
         signal: AbortSignal.timeout(65000),
       });
@@ -1656,7 +1679,7 @@ async function sendThreadMessage(id) {
       ).join('\n\n');
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           text: '以下是我和你的对话历史，请针对我最后一条消息继续回复：\n\n' + context,
           prompt: entry.prompt || ''

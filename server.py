@@ -11,6 +11,7 @@ from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+ACCESS_CODE = os.environ.get("ACCESS_CODE", "")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 INBOX_FILE = os.path.join(os.path.dirname(__file__), "inbox.md")
 REPLIES_FILE = os.path.join(os.path.dirname(__file__), "replies.json")
@@ -82,13 +83,24 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=os.path.dirname(__file__), **kwargs)
 
+    def _check_auth(self):
+        """如果设置了 ACCESS_CODE，检查请求头中的授权码。"""
+        if not ACCESS_CODE:
+            return True
+        auth = self.headers.get("X-Sizai-Auth", "")
+        return auth == ACCESS_CODE
+
     def do_GET(self):
         if self.path == "/api/question":
             self.handle_question()
         elif self.path == "/api/inbox":
             self.handle_get_inbox()
         elif self.path == "/api/ping":
-            self.send_json({"ok": True, "has_api_key": bool(DEEPSEEK_KEY)})
+            self.send_json({
+                "ok": True,
+                "has_api_key": bool(DEEPSEEK_KEY),
+                "needs_auth": bool(ACCESS_CODE),
+            })
         elif self.path == "/api/replies":
             self.handle_get_replies()
         else:
@@ -101,6 +113,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": "not_found"}, 404)
 
     def handle_question(self):
+        if not self._check_auth():
+            self.send_json({"error": "unauthorized"}, 401)
+            return
         if not DEEPSEEK_KEY:
             self.send_json({"error": "no_api_key"})
             return
@@ -112,6 +127,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def handle_submit(self):
         """Receive a writing from the user, save to inbox, and generate AI reply."""
+        if not self._check_auth():
+            self.send_json({"error": "unauthorized"}, 401)
+            return
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode("utf-8"))
