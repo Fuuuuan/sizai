@@ -288,6 +288,47 @@
   .char-count { margin-left: auto; }
 
   /* ── Garden / Card List ── */
+  .search-box {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .search-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 10px 40px 10px 16px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: var(--font-sans);
+    outline: none;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: border-color 0.3s;
+  }
+  .search-input:focus {
+    border-color: rgba(212,168,84,0.4);
+    box-shadow: 0 0 20px rgba(212,168,84,0.06);
+  }
+  .search-input::placeholder {
+    color: rgba(200,200,220,0.25);
+  }
+  .search-clear {
+    position: absolute;
+    right: 14px; top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: rgba(200,200,220,0.4);
+    font-size: 0.8rem;
+    padding: 4px;
+  }
+  .search-clear:hover { color: var(--accent); }
+  .search-result {
+    font-size: 0.7rem;
+    color: rgba(200,200,220,0.35);
+    margin-bottom: 10px;
+    text-align: center;
+  }
   .garden-list {
     display: flex; flex-direction: column; gap: 10px;
   }
@@ -487,6 +528,12 @@
 
   <!-- GARDEN PANEL — Constellation -->
   <section class="panel" id="panel-garden">
+    <div class="search-box" id="searchBox">
+      <input type="text" id="searchInput" class="search-input"
+        placeholder="搜索星辰…" oninput="filterGarden()">
+      <span class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none;">✕</span>
+    </div>
+    <div class="search-result" id="searchResult" style="display:none;"></div>
     <div class="garden-list" id="gardenList"></div>
     <div class="empty-state" id="gardenEmpty">
       还没有文字。<br>去「书写」那里留下你的第一个想法吧。
@@ -665,8 +712,10 @@ function refreshUI(){
   if(sendBtn) sendBtn.textContent = t('btn_send');
   const clearBtn = document.getElementById('btnClear');
   if(clearBtn) clearBtn.textContent = t('btn_clear');
+  const si = document.getElementById('searchInput');
+  if(si) si.placeholder = L==='zh'?'搜索星辰…':'Search stars…';
   if(currentQuestion) displayQuestion(currentQuestion);
-  renderGarden();
+  renderGarden(si ? si.value : '');
   const ge = document.getElementById('gardenEmpty');
   if(ge) ge.innerHTML = t('garden_empty');
 }
@@ -1145,7 +1194,7 @@ document.querySelectorAll('nav button').forEach(btn => {
     const panelName = btn.dataset.panel;
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + panelName).classList.add('active');
-    if (panelName === 'garden') renderGarden();
+    if (panelName === 'garden') renderGarden(document.getElementById('searchInput')?.value || '');
     if (panelName === 'question' && currentQuestion) displayQuestion(currentQuestion);
   });
 });
@@ -1231,6 +1280,16 @@ function getEntries() {
   catch(e) { return []; }
 }
 
+function filterGarden() {
+  const q = document.getElementById('searchInput').value;
+  renderGarden(q);
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  renderGarden('');
+}
+
 function deleteEntry(id) {
   let entries = getEntries();
   entries = entries.filter(e => e.id !== id);
@@ -1241,20 +1300,52 @@ function deleteEntry(id) {
   toast('已删除');
 }
 
-function renderGarden() {
+function renderGarden(filter) {
   const entries = getEntries();
   const list = document.getElementById('gardenList');
   const empty = document.getElementById('gardenEmpty');
+  const searchResult = document.getElementById('searchResult');
+  const searchInput = document.getElementById('searchInput');
+  const searchClear = document.getElementById('searchClear');
 
   if (entries.length === 0) {
+    document.getElementById('searchBox').style.display = 'none';
     list.style.display = 'none';
     empty.style.display = 'block';
+    searchResult.style.display = 'none';
     return;
   }
+  document.getElementById('searchBox').style.display = 'block';
   list.style.display = 'flex';
   empty.style.display = 'none';
 
-  const sorted = [...entries].reverse(); // oldest → newest
+  let sorted = [...entries].reverse(); // oldest → newest
+
+  // Filter if search term provided
+  if (filter && filter.trim()) {
+    const q = filter.trim().toLowerCase();
+    sorted = sorted.filter(e => {
+      if (e.text.toLowerCase().includes(q)) return true;
+      if (e.prompt && e.prompt.toLowerCase().includes(q)) return true;
+      if (e.thread) {
+        return e.thread.some(m => m.text.toLowerCase().includes(q));
+      }
+      return false;
+    });
+    searchResult.style.display = 'block';
+    const isZh = L === 'zh';
+    if (sorted.length === 0) {
+      searchResult.textContent = isZh ? '没有匹配的星辰' : 'No matching stars';
+    } else {
+      searchResult.textContent = (isZh ? '找到 ' : 'Found ') + sorted.length + (isZh ? ' 颗星' : ' stars');
+    }
+  } else {
+    searchResult.style.display = 'none';
+  }
+
+  if (searchInput) {
+    searchClear.style.display = (filter && filter.trim()) ? 'block' : 'none';
+  }
 
   list.innerHTML = sorted.map((e, i) => {
     const d = new Date(e.date);
