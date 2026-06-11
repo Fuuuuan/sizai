@@ -323,6 +323,8 @@
     padding: 4px;
   }
   .search-clear:hover { color: var(--accent); }
+  .btn-end { display: none; border-color: rgba(200,180,140,0.2); font-size: 0.8rem; }
+  .btn-end:hover { border-color: rgba(200,140,100,0.4); color: rgba(200,160,100,0.8); }
   .search-result {
     font-size: 0.7rem;
     color: rgba(200,200,220,0.35);
@@ -518,10 +520,11 @@
         <span class="prompt-ref" id="promptRef"></span>
         <span class="char-count" id="charCount">0 字</span>
       </div>
-      <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+      <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
         <button class="btn primary" onclick="saveEntry()">✦ 保存为星辰</button>
         <button class="btn" onclick="sendToClaude()" id="btnSend" style="border-color:rgba(180,200,220,0.3);">↗ 与 Claude 思辨</button>
         <button class="btn" onclick="clearWrite()" id="btnClear">清空</button>
+        <button class="btn" onclick="endConversation()" id="btnEndConv" style="display:none; border-color:rgba(200,180,140,0.2);">结束此段</button>
       </div>
     </div>
   </section>
@@ -712,6 +715,8 @@ function refreshUI(){
   if(sendBtn) sendBtn.textContent = t('btn_send');
   const clearBtn = document.getElementById('btnClear');
   if(clearBtn) clearBtn.textContent = t('btn_clear');
+  const endBtn = document.getElementById('btnEndConv');
+  if(endBtn) endBtn.textContent = L==='zh'?'结束此段':'End Thread';
   const si = document.getElementById('searchInput');
   if(si) si.placeholder = L==='zh'?'搜索星辰…':'Search stars…';
   if(currentQuestion) displayQuestion(currentQuestion);
@@ -1234,13 +1239,16 @@ let currentPrompt = '';
 let editingId = null;  // 非 null 时表示正在编辑某个已有星辰
 
 function goWriteWithQuestion() {
+  // 结束旧对话，开新的
+  endConversation();
   if (!currentQuestion) currentQuestion = getDailyQuestion();
   currentPrompt = currentQuestion.q;
-  document.getElementById('promptRef').textContent = '回应：「' + currentQuestion.q.slice(0, 40) + '…」';
+  document.getElementById('promptRef').textContent = (L==='zh'?'回应':'Responding') + '：「' + currentQuestion.q.slice(0, 40) + '…」';
   document.getElementById('writeMeta').innerHTML =
-    '<span style="color:var(--accent);">回应问题</span>';
+    '<span style="color:var(--accent);">' + (L==='zh'?'回应问题':'Responding') + '</span>';
   switchPanel('write');
   document.getElementById('writeArea').focus();
+  document.getElementById('writeArea').placeholder = t('write_placeholder');
 }
 
 function switchPanel(name) {
@@ -1250,15 +1258,30 @@ function switchPanel(name) {
   document.getElementById('panel-' + name).classList.add('active');
 }
 
-function clearWrite() {
-  document.getElementById('writeArea').value = '';
-  document.getElementById('writeArea').placeholder = '此刻，你在想什么？…';
-  currentPrompt = '';
+function endConversation() {
   editingId = null;
+  currentPrompt = '';
+  document.getElementById('writeArea').value = '';
+  document.getElementById('writeArea').placeholder = t('write_placeholder');
   document.getElementById('promptRef').textContent = '';
   document.getElementById('writeMeta').innerHTML = '';
   document.getElementById('threadPreview').style.display = 'none';
-  document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存为星辰';
+  document.getElementById('btnEndConv').style.display = 'none';
+  document.querySelector('#panel-write .btn.primary').textContent = t('saving_star');
+  updateCharCount();
+  toast(L==='zh'?'已开启新对话':'New conversation');
+}
+
+function clearWrite() {
+  editingId = null;
+  currentPrompt = '';
+  document.getElementById('writeArea').value = '';
+  document.getElementById('writeArea').placeholder = t('write_placeholder');
+  document.getElementById('promptRef').textContent = '';
+  document.getElementById('writeMeta').innerHTML = '';
+  document.getElementById('threadPreview').style.display = 'none';
+  document.getElementById('btnEndConv').style.display = 'none';
+  document.querySelector('#panel-write .btn.primary').textContent = t('saving_star');
   updateCharCount();
 }
 
@@ -1511,6 +1534,7 @@ function openStarInWriter(id) {
       + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">修改后保存，或发送给 Claude 开始对话</span>';
   }
   document.querySelector('#panel-write .btn.primary').textContent = '✦ 保存';
+  document.getElementById('btnEndConv').style.display = (e.thread && e.thread.length > 0) ? '' : 'none';
   switchPanel('write');
   updateCharCount();
   document.getElementById('writeArea').focus();
@@ -1626,18 +1650,46 @@ async function sendToClaude() {
       entries[idx].editedAt = now;
     }
   } else {
+    const newId = Date.now();
     entries.unshift({
-      id: Date.now(),
+      id: newId,
       text,
       prompt: prompt || null,
       date: now,
       thread: newMsgs,
     });
+    editingId = newId;  // 新建后自动进入继续模式
   }
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
   syncAutoSave();
 
-  clearWrite();
+  // ── 不清空面板，切换到继续对话模式 ──
+  document.getElementById('writeArea').value = '';
+  document.getElementById('writeArea').placeholder = t('prompt_continue');
+  document.getElementById('writeMeta').innerHTML =
+    '<span style="color:var(--accent);">✦ 对话中</span>'
+    + ' <span style="font-size:0.7rem;color:rgba(200,200,220,0.35);">继续输入，发送后追加到这颗星辰</span>';
+  document.querySelector('#panel-write .btn.primary').textContent = t('saving_update');
+  document.getElementById('btnEndConv').style.display = '';
+  // 刷新线程预览
+  const tp = document.getElementById('threadPreview');
+  if (tp && editingId) {
+    const e = getEntries().find(en => en.id === editingId);
+    if (e && e.thread) {
+      tp.style.display = 'block';
+      tp.innerHTML = e.thread.map((msg, i) => {
+        const isUser = msg.role === 'user';
+        const roleColor = isUser ? 'var(--accent)' : 'rgba(140,200,160,0.7)';
+        const label = isUser ? '💭 你' : '🌿 Claude';
+        const cid = 'tpc-' + i;
+        return '<div class="tp-msg">'
+          + '<div class="tp-role" style="color:' + roleColor + '">' + label + '</div>'
+          + '<div class="tp-content" id="' + cid + '" style="max-height:4.5em;overflow:hidden;">' + escapeHtml(msg.text) + '</div>'
+          + '<a href="#" class="tp-expand" onclick="toggleTPMsg(\'' + cid + '\',this);return false;" style="font-size:0.65rem;color:var(--accent);">展开</a>'
+          + '</div>';
+      }).join('');
+    }
+  }
   initStars();
 
   if (reply) {
