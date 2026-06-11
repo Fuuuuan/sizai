@@ -139,6 +139,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         text = body.get("text", "").strip()
         prompt = body.get("prompt", "")
+        history = body.get("history", None)
         if not text:
             self.send_json({"error": "empty_text"}, 400)
             return
@@ -156,29 +157,35 @@ class Handler(SimpleHTTPRequestHandler):
         print(f"  ✦ 收到思辨文字 ({len(text)} 字)")
 
         # Generate AI reply via DeepSeek
-        reply = self.generate_reply(text, prompt)
+        reply = self.generate_reply(text, prompt, history)
         if reply:
             self.send_json({"ok": True, "chars": len(text), "reply": reply})
         else:
             self.send_json({"ok": True, "chars": len(text), "reply_fallback": True})
 
-    def generate_reply(self, text, prompt):
+    def generate_reply(self, text, prompt, history=None):
         """Use DeepSeek API to generate a philosophical reply."""
         if not DEEPSEEK_KEY:
             print("  ⚠ 未设置 DEEPSEEK_API_KEY，跳过 AI 回复")
             return None
 
+        # 构建消息数组：system + 历史 + 当前用户消息
+        messages = [{"role": "system", "content": REPLY_SYSTEM_PROMPT}]
+
+        if history:
+            for msg in history:
+                role = "assistant" if msg.get("role") == "claude" else "user"
+                messages.append({"role": role, "content": msg.get("text", "")})
+
         user_content = "用户写下了以下思辨文字：\n\n"
         if prompt:
             user_content += f"（用户在回应这个问题：「{prompt}」）\n\n"
         user_content += text
+        messages.append({"role": "user", "content": user_content})
 
         try:
             print("  → 正在用 DeepSeek 生成 AI 回复…")
-            reply = _deepseek([
-                {"role": "system", "content": REPLY_SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ], max_tokens=600)
+            reply = _deepseek(messages, max_tokens=600)
             if reply:
                 self.save_reply(text[:30], reply)
                 print(f"  ✓ AI 回复已生成 ({len(reply)} 字)")

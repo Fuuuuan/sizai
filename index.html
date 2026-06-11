@@ -1567,16 +1567,13 @@ async function sendToClaude() {
   btn.innerHTML = '<span class="spinner"></span> ' + t('spinner_sending');
   btn.disabled = true;
 
-  // ── 如果是继续已有线程，带上下文一起发送 ──
-  let apiText = text;
+  // ── 如果是继续已有线程，提取历史 ──
+  let threadHistory = null;
   if (editingId) {
     const entries = getEntries();
     const entry = entries.find(e => e.id === editingId);
     if (entry && entry.thread && entry.thread.length > 0) {
-      const context = entry.thread.map(m =>
-        (m.role === 'user' ? (L==='zh'?'我':'Me') + '：' : 'Claude：') + m.text
-      ).join('\n\n');
-      apiText = (L==='zh'?'以下是我们的对话历史':'Here is our conversation history') + '：\n\n' + context + '\n\n' + (L==='zh'?'我（继续）':'Me (continuing)') + '：' + text;
+      threadHistory = entry.thread;  // [{role, text, date}, ...]
     }
   }
 
@@ -1590,7 +1587,7 @@ async function sendToClaude() {
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ text: apiText, prompt }),
+        body: JSON.stringify({ text, prompt, history: threadHistory }),
         signal: AbortSignal.timeout(65000),
       });
       const data = await resp.json();
@@ -1604,7 +1601,7 @@ async function sendToClaude() {
   }
 
   if (!sent) {
-    copyToClipboard(apiText, prompt);
+    copyToClipboard(text, prompt);
     toast(t('toast_copied'));
   }
 
@@ -1675,19 +1672,18 @@ async function sendThreadMessage(id) {
   entry.text = newMsg;
   entry.editedAt = now;
 
-  // 构建完整对话上下文发给 Claude
+  // 构建结构化对话历史发给服务器
   let reply = null;
   if (apiOnline) {
     try {
-      const context = entry.thread.map(m =>
-        (m.role === 'user' ? '我：' : 'Claude：') + m.text
-      ).join('\n\n');
+      const history = entry.thread.slice(0, -1); // 不包含刚加入的新消息
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          text: '以下是我和你的对话历史，请针对我最后一条消息继续回复：\n\n' + context,
-          prompt: entry.prompt || ''
+          text: newMsg,
+          prompt: entry.prompt || '',
+          history: history
         }),
         signal: AbortSignal.timeout(65000),
       });
