@@ -1185,9 +1185,11 @@ async function fetchFromAPI() {
 }
 
 async function checkAPIStatus() {
+  const st = document.getElementById('apiStatus');
+  st.textContent = L==='zh'?'正在连接服务器…':'Connecting to server…';
   try {
     const resp = await fetch(`${API_BASE}/api/ping`, {
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(45000)  // Render 冷启动最多等 45 秒
     });
     const data = await resp.json();
     if (data.ok) {
@@ -1198,6 +1200,7 @@ async function checkAPIStatus() {
       document.getElementById('apiStatus').className = 'api-status online';
       document.getElementById('btnAI').style.display = hasKey ? '' : '';
       if (needsAuth && !accessCode) showAuthPrompt();
+      refreshUI();
       return;
     }
   } catch(e) {}
@@ -1206,6 +1209,7 @@ async function checkAPIStatus() {
   document.getElementById('apiStatus').textContent = t('status_local') + ' · 170+';
   document.getElementById('apiStatus').className = 'api-status offline';
   document.getElementById('btnAI').style.display = '';
+  refreshUI();
 }
 
 // ═══════════════════════════════════════
