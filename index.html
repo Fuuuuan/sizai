@@ -1448,7 +1448,7 @@ function openEntry(id) {
         + '<button class="close-btn" onclick="closeModal()" style="margin-left:auto;">关闭</button>'
         + '</div></div>';
     } else {
-      bodyHTML += '<div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px; font-size:0.75rem; color:rgba(200,200,220,0.3); text-align:center;">在电脑上打开思在，连接 Claude 继续这段对话</div>'
+      bodyHTML += '<div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px; font-size:0.75rem; color:rgba(200,200,220,0.3); text-align:center;">' + (L==='zh'?'AI 服务器连接中，请稍候刷新…':'Connecting to AI server, please wait…') + '</div>'
         + '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">'
         + '<button class="btn" onclick="editEntry(' + e.id + ')">✎ 编辑</button>'
         + '<button class="close-btn" onclick="closeModal()" style="margin-left:auto;">关闭</button>'
