@@ -730,7 +730,8 @@ setTimeout(() => refreshUI(), 100); // 等 DOM 就绪后刷新 UI
 // ═══════════════════════════════════════
 //  CONFIGURATION
 // ═══════════════════════════════════════
-const API_BASE = 'http://localhost:8899';
+// 自动判断：本地开发用 localhost，线上用 Render
+const API_BASE = location.hostname === 'localhost' ? 'http://localhost:8899' : 'https://sizai.onrender.com';
 let needsAuth = false;
 let accessCode = localStorage.getItem('sizai_access_code') || '';
 // 授权码：加在所有 AI 请求的 header 上

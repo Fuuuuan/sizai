@@ -11,13 +11,14 @@ https://fuuuuan.github.io/sizai/
 ```
 On mobile, add to home screen to use as a PWA.
 
-### Local (with AI Dialogue)
+AI dialogue is available via DeepSeek (access code required).
+
+### Local (development)
 ```bash
+export DEEPSEEK_API_KEY="sk-your-key"
 python3 server.py
 ```
-Open `http://localhost:8899` to engage in real-time philosophical dialogue with Claude. All conversations are automatically saved as threaded stars in the Garden.
-
-Or double-click `思在.command` on macOS for one-click launch.
+Open `http://localhost:8899`.
 
 ## Features
 
