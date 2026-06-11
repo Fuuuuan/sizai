@@ -1910,41 +1910,41 @@ function exportData() {
     entries: getEntries(),
     exportedAt: new Date().toISOString(),
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'sizai-backup-' + new Date().toISOString().slice(0, 10) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  toast(L==='zh'?'已下载备份文件':'Backup downloaded');
+  const text = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(text).then(() => {
+    toast(L==='zh'?'已复制到剪贴板 · 粘贴到备忘录或任何地方保存':'Copied · Paste into Notes or anywhere to save');
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast(L==='zh'?'已复制到剪贴板':'Copied to clipboard');
+  });
+  closeSettings();
 }
 
 function importData() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
-  input.onchange = () => {
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result);
-        if (!data.entries || !Array.isArray(data.entries)) throw new Error('Invalid format');
-        const merged = syncMerge(getEntries(), data.entries);
-        localStorage.setItem('sizai_entries', JSON.stringify(merged));
-        renderGarden();
-        initStars();
-        syncAutoSave();
-        toast((L==='zh'?'已导入 ':'Imported ') + merged.length + (L==='zh'?' 条记录':' entries'));
-      } catch(e) {
-        toast(L==='zh'?'文件格式不正确':'Invalid file format');
-      }
-    };
-    reader.readAsText(file);
-  };
-  input.click();
+  const isZh = L === 'zh';
+  const code = prompt(
+    isZh ? '请粘贴之前导出的备份数据：' : 'Paste the backup data here:'
+  );
+  if (!code || !code.trim()) return;
+  try {
+    const data = JSON.parse(code.trim());
+    if (!data.entries || !Array.isArray(data.entries)) throw new Error('Invalid');
+    const merged = syncMerge(getEntries(), data.entries);
+    localStorage.setItem('sizai_entries', JSON.stringify(merged));
+    renderGarden();
+    initStars();
+    syncAutoSave();
+    toast((isZh?'已恢复 ':'Restored ') + merged.length + (isZh?' 条记录':' entries'));
+  } catch(e) {
+    toast(isZh?'格式不对，请确认复制了完整内容':'Wrong format. Make sure you copied the full content.');
+  }
 }
 
 function closeSettings(e) {
