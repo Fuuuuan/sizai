@@ -1878,7 +1878,13 @@ function openSettings() {
     + (isZh?'需要一个 GitHub Personal Access Token（<b>gist</b> 权限）。Token 只保存在你的浏览器中。<br><br>创建：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → 只勾选 gist 权限。':'A GitHub Personal Access Token with <b>gist</b> scope is needed. It stays in your browser only.<br><br>Create one: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → select gist scope only.')
     + '</p>'
     + '<input id="tokenInput" type="password" style="width:100%; background:rgba(10,10,20,0.5); border:1px solid var(--border); border-radius:8px; padding:10px; color:var(--text); font-size:0.8rem; outline:none;" placeholder="ghp_..." value="' + (syncToken ? syncToken.slice(0, 8) + '…' : '') + '">'
-    + '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'
+    + '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">'
+    + '<p style="font-size:0.75rem;color:rgba(200,200,220,0.4);margin-bottom:8px;">' + (isZh?'备份与恢复':'Backup & Restore') + '</p>'
+    + '<div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">'
+    + '<button class="btn" onclick="exportData()">📥 ' + (isZh?'导出数据':'Export') + '</button>'
+    + '<button class="btn" onclick="importData()">📤 ' + (isZh?'导入数据':'Import') + '</button>'
+    + '</div>'
+    + '<div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">'
     + '<button class="btn primary" onclick="saveToken()">' + (isZh?'保存':'Save') + '</button>'
     + '<button class="btn" onclick="syncNow()">' + (isZh?'立即同步':'Sync Now') + '</button>'
     + '<button class="close-btn" onclick="closeSettings()" style="margin-left:auto;">' + (isZh?'关闭':'Close') + '</button>'
@@ -1897,6 +1903,48 @@ function saveToken() {
     toast(L==='zh'?'Token 已保存':'Token saved');
   }
   closeSettings();
+}
+
+function exportData() {
+  const data = {
+    entries: getEntries(),
+    exportedAt: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sizai-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(L==='zh'?'已下载备份文件':'Backup downloaded');
+}
+
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data.entries || !Array.isArray(data.entries)) throw new Error('Invalid format');
+        const merged = syncMerge(getEntries(), data.entries);
+        localStorage.setItem('sizai_entries', JSON.stringify(merged));
+        renderGarden();
+        initStars();
+        syncAutoSave();
+        toast((L==='zh'?'已导入 ':'Imported ') + merged.length + (L==='zh'?' 条记录':' entries'));
+      } catch(e) {
+        toast(L==='zh'?'文件格式不正确':'Invalid file format');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 function closeSettings(e) {
@@ -1936,6 +1984,13 @@ console.log('%c你的每一段文字，都会变成一颗星。',
 // Register Service Worker (PWA)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js', { scope: '/sizai/' }).catch(() => {});
+}
+
+// 请求持久化存储（PWA 安装后通常自动授予）
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(granted => {
+    if (granted) console.log('📦 存储已持久化 — 不会被浏览器自动清理');
+  });
 }
 
 // ── 启动时同步 ──
