@@ -12,7 +12,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "")
-DEEPSEEK_URL = "https://api.deepseek.com/anthropic/v1/messages"
+DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 INBOX_FILE = os.path.join(os.path.dirname(__file__), "inbox.md")
 REPLIES_FILE = os.path.join(os.path.dirname(__file__), "replies.json")
 
@@ -46,29 +46,28 @@ SYSTEM_PROMPT = """你是一位哲学导师，擅长提出引人深思的问题�
 {"q": "问题文本", "src": "—— 来源标注"}"""
 
 
-def _deepseek(system, messages, max_tokens=600, model="deepseek-v4-pro"):
-    """Call DeepSeek via Anthropic-compatible API (same endpoint as Claude Code)."""
+def _deepseek(messages, max_tokens=600, model="deepseek-chat"):
+    """Call DeepSeek API (OpenAI-compatible)."""
     if not DEEPSEEK_KEY:
         raise ValueError("未设置 DEEPSEEK_API_KEY")
     body = json.dumps({
         "model": model,
         "max_tokens": max_tokens,
-        "system": system,
         "messages": messages,
     }).encode("utf-8")
     req = urllib.request.Request(DEEPSEEK_URL, data=body, headers={
-        "x-api-key": DEEPSEEK_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        "Authorization": f"Bearer {DEEPSEEK_KEY}",
+        "Content-Type": "application/json",
     })
     with urllib.request.urlopen(req, timeout=60) as resp:
         data = json.loads(resp.read().decode("utf-8"))
-    return data["content"][0]["text"].strip()
+    return data["choices"][0]["message"]["content"].strip()
 
 
 def generate_question():
     """调用 DeepSeek API 生成一个全新的哲学问题。"""
-    text = _deepseek(SYSTEM_PROMPT, [
+    text = _deepseek([
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "请生成一个全新的哲学问题。"},
     ], max_tokens=200)
     # Parse the JSON from the response (handle possible markdown wrapping)
@@ -170,8 +169,9 @@ class Handler(SimpleHTTPRequestHandler):
             print("  ⚠ 未设置 DEEPSEEK_API_KEY，跳过 AI 回复")
             return None
 
-        # 构建对话消息（system 单独传，不在 messages 里）
-        messages = []
+        # 构建消息数组：system + 历史 + 当前用户消息
+        messages = [{"role": "system", "content": REPLY_SYSTEM_PROMPT}]
+
         if history:
             for msg in history:
                 role = "assistant" if msg.get("role") == "claude" else "user"
@@ -184,8 +184,8 @@ class Handler(SimpleHTTPRequestHandler):
         messages.append({"role": "user", "content": user_content})
 
         try:
-            print("  → 正在用 DeepSeek v4-pro 生成 AI 回复…")
-            reply = _deepseek(REPLY_SYSTEM_PROMPT, messages, max_tokens=600)
+            print("  → 正在用 DeepSeek R1 生成 AI 回复…")
+            reply = _deepseek(messages, max_tokens=600, model="deepseek-reasoner")
             if reply:
                 self.save_reply(text[:30], reply)
                 print(f"  ✓ AI 回复已生成 ({len(reply)} 字)")
