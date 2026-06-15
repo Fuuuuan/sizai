@@ -586,7 +586,7 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
@@ -669,12 +669,19 @@ async function loadFromCloud() {
   try {
     const r = await fetch(API_BASE + '/api/entries', { headers: dbHeaders() });
     if (r.ok) {
-      const data = await r.json();
-      saveEntries(data.map(e => ({
+      const remote = await r.json();
+      const remoteEntries = remote.map(e => ({
         id: e.id, text: e.text, prompt: e.prompt,
         date: e.date, editedAt: e.edited_at,
         thread: e.thread || [],
-      })));
+      }));
+      // 合并：云端优先，本地未上传的保留
+      const local = getEntries();
+      const map = new Map();
+      remoteEntries.forEach(e => map.set(e.id, e));
+      local.forEach(e => { if (!map.has(e.id)) map.set(e.id, e); });
+      const merged = Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      saveEntries(merged);
       return true;
     }
   } catch(e) {}
@@ -2256,6 +2263,9 @@ console.log('%c你的每一段文字，都会变成一颗星。',
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js', { scope: '/sizai/' }).catch(() => {});
 }
+
+// ── 启动时同步 ──
+checkAuth();
 
 // 请求持久化存储（PWA 安装后通常自动授予）
 if (navigator.storage && navigator.storage.persist) {

@@ -388,7 +388,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Sizai-Auth")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Sizai-Auth, X-Sizai-Token")
         self.end_headers()
 
     def log_message(self, format, *args):
