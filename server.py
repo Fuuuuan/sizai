@@ -85,8 +85,8 @@ def generate_question():
     """调用 DeepSeek API 生成一个全新的哲学问题。"""
     text = _deepseek([
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": "生成一个哲学命题。日常语言，清晰有力。不是生活建议，不是心理咨询。"},
-    ], max_tokens=200, temperature=0.5)
+        {"role": "user", "content": "生成一个哲学命题。日常语言，清晰有力。"},
+    ], max_tokens=300, model="deepseek-reasoner")
     # Parse the JSON from the response (handle possible markdown wrapping)
     text = text.strip()
     if text.startswith("```"):
