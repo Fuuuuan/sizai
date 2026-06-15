@@ -613,7 +613,7 @@ async function checkAuth() {
   try {
     const r = await fetch(API_BASE + '/api/entries', {
       headers: dbHeaders(),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(50000),  // 冷启动可能 >30s
     });
     if (r.ok) {
       const remote = await r.json();
@@ -2294,6 +2294,11 @@ if ('serviceWorker' in navigator) {
 
 // ── 启动时同步 ──
 checkAuth();
+
+// 页面获得焦点时重新同步
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && authToken) checkAuth();
+});
 
 // 请求持久化存储（PWA 安装后通常自动授予）
 if (navigator.storage && navigator.storage.persist) {
