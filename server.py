@@ -21,6 +21,8 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "")
+GIST_TOKEN = os.environ.get("GIST_TOKEN", "")
+GIST_ID = os.environ.get("GIST_ID", "")
 DB_PATH = os.path.join(os.path.dirname(__file__), "sizai.db")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 INBOX_FILE = os.path.join(os.path.dirname(__file__), "inbox.md")
@@ -404,7 +406,68 @@ db.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCR
 db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT NOT NULL, prompt TEXT, date TEXT, edited_at TEXT, thread TEXT DEFAULT '[]', FOREIGN KEY(user_id) REFERENCES users(id))")
 db.commit()
 
+# ── Gist 备份/恢复 ──
+def _backup_to_gist():
+    """将 SQLite 数据库备份到 GitHub Gist。"""
+    if not GIST_TOKEN or not GIST_ID:
+        return
+    try:
+        import base64
+        with open(DB_PATH, "rb") as f:
+            content = base64.b64encode(f.read()).decode("ascii")
+        body = json.dumps({
+            "files": {"sizai.db": {"content": content}}
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{GIST_ID}",
+            data=body, method="PATCH",
+            headers={
+                "Authorization": f"Bearer {GIST_TOKEN}",
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        urllib.request.urlopen(req, timeout=15)
+        print("  ✓ 已备份到 Gist")
+    except Exception as e:
+        print(f"  ⚠ Gist 备份失败: {e}")
+
+def _restore_from_gist():
+    """从 GitHub Gist 恢复 SQLite 数据库。"""
+    if not GIST_TOKEN or not GIST_ID:
+        return False
+    try:
+        import base64
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{GIST_ID}",
+            headers={
+                "Authorization": f"Bearer {GIST_TOKEN}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            gist = json.loads(resp.read().decode("utf-8"))
+        file_data = gist.get("files", {}).get("sizai.db", {})
+        if file_data and file_data.get("content"):
+            with open(DB_PATH, "wb") as f:
+                f.write(base64.b64decode(file_data["content"]))
+            print("  ✓ 已从 Gist 恢复数据库")
+            return True
+    except Exception as e:
+        print(f"  ⚠ Gist 恢复失败: {e}")
+    return False
+
+# 每 5 分钟自动备份
+import threading, time
+def _auto_backup():
+    while True:
+        time.sleep(300)
+        _backup_to_gist()
+threading.Thread(target=_auto_backup, daemon=True).start()
+
 if __name__ == "__main__":
+    # 启动时尝试恢复
+    _restore_from_gist()
     host = "0.0.0.0"
     port = int(os.environ.get("PORT", "8899"))
     print("=" * 50)

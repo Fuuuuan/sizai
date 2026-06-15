@@ -9,3 +9,7 @@ services:
         sync: false
       - key: ACCESS_CODE
         sync: false
+      - key: GIST_TOKEN
+        sync: false
+      - key: GIST_ID
+        sync: false
