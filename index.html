@@ -586,7 +586,7 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
@@ -606,21 +606,49 @@ function dbHeaders() {
 }
 
 async function checkAuth() {
-  if (!authToken) { updateAuthUI(false); return; }
+  if (!authToken || !authEmail) { updateAuthUI(false); return; }
+  // 有 token 就先显示登录状态，不等到服务器确认
+  authUser = { email: authEmail };
+  updateAuthUI(true);
   try {
-    const r = await fetch(API_BASE + '/api/entries?select=id&limit=1', { headers: dbHeaders() });
+    const r = await fetch(API_BASE + '/api/entries', {
+      headers: dbHeaders(),
+      signal: AbortSignal.timeout(30000),
+    });
     if (r.ok) {
-      authUser = { email: authEmail };
-      updateAuthUI(true);
-      const changed = await loadFromCloud();
-      if (changed) { renderGarden(); initStars(); refreshUI(); }
-    } else {
+      const remote = await r.json();
+      if (remote.length > 0) {
+        // 合并：云端数据 + 本地未同步的
+        const local = getEntries();
+        const map = new Map();
+        remote.forEach(e => {
+          map.set(e.id, {
+            id: e.id, text: e.text, prompt: e.prompt,
+            date: e.date, editedAt: e.edited_at,
+            thread: e.thread || [],
+          });
+        });
+        local.forEach(e => { if (!map.has(e.id)) map.set(e.id, e); });
+        const merged = Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        saveEntries(merged);
+        renderGarden(); initStars(); refreshUI();
+      } else {
+        // 云端为空但有本地数据 → 上传本地
+        await migrateLocalToCloud();
+      }
+    } else if (r.status === 401) {
+      // 只有 token 真的过期才清除
       authToken = null; authUser = null; authEmail = '';
       localStorage.removeItem('sizai_auth_token');
       localStorage.removeItem('sizai_auth_email');
       updateAuthUI(false);
+      return;
     }
-  } catch(e) { updateAuthUI(false); }
+    // 其他错误（网络、超时）→ 保持登录状态，用本地数据
+  } catch(e) {
+    // 网络不通 → 保持登录状态，用本地数据，标记待同步
+    console.log('Sync deferred:', e.message);
+  }
 }
 
 function updateAuthUI(loggedIn) {
