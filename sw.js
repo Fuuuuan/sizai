@@ -1,19 +1,9 @@
-// 思在 Service Worker
-// 缓存静态资源，支持离线访问
+// 思在 Service Worker — v2
+// 网络优先策略，确保始终拿到最新版本
 
-const CACHE_NAME = 'sizai-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
+const CACHE_NAME = 'sizai-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -29,22 +19,24 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // 对 API 请求不做缓存，直接走网络
-  if (event.request.url.includes('/api/')) {
-    return;
-  }
+  // 跳过 API 请求
+  if (event.request.url.includes('/api/')) return;
+  // 跳过非 GET 请求
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        // 缓存成功的请求
-        if (response.ok && response.type === 'basic') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
-          });
-        }
-        return response;
-      });
+    fetch(event.request).then((response) => {
+      // 网络成功 → 缓存并返回
+      if (response.ok) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, clone);
+        });
+      }
+      return response;
+    }).catch(() => {
+      // 网络失败 → 从缓存取
+      return caches.match(event.request);
     })
   );
 });
