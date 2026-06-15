@@ -6,6 +6,9 @@
 
 import json
 import os
+import sqlite3
+import hashlib
+import secrets
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -18,8 +21,7 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "")
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+DB_PATH = os.path.join(os.path.dirname(__file__), "sizai.db")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 INBOX_FILE = os.path.join(os.path.dirname(__file__), "inbox.md")
 REPLIES_FILE = os.path.join(os.path.dirname(__file__), "replies.json")
@@ -97,34 +99,122 @@ class Handler(SimpleHTTPRequestHandler):
         auth = self.headers.get("X-Sizai-Auth", "")
         return auth == ACCESS_CODE
 
+    def _check_token(self):
+        """验证用户 token，返回 user_id 或 None。"""
+        token = self.headers.get("X-Sizai-Token", "")
+        if not token:
+            return None
+        cur = db.cursor()
+        cur.execute("SELECT user_id FROM sessions WHERE token=? AND expires>?", (token, datetime.now().isoformat()))
+        row = cur.fetchone()
+        return row[0] if row else None
+
     def do_GET(self):
         if self.path == "/api/question":
             self.handle_question()
-        elif self.path == "/api/inbox":
-            self.handle_get_inbox()
         elif self.path == "/api/ping":
             self.send_json({
                 "ok": True,
                 "has_api_key": bool(DEEPSEEK_KEY),
                 "needs_auth": bool(ACCESS_CODE),
             })
-        elif self.path == "/api/replies":
-            self.handle_get_replies()
+        elif self.path.startswith("/api/entries"):
+            self.handle_get_entries()
         else:
             super().do_GET()
 
     def do_POST(self):
         if self.path == "/api/submit":
             self.handle_submit()
-        elif self.path == "/api/supabase":
-            self.handle_sb_proxy()
+        elif self.path == "/api/auth/signup":
+            self.handle_signup()
+        elif self.path == "/api/auth/login":
+            self.handle_login()
+        elif self.path == "/api/entries":
+            self.handle_save_entry()
+        elif self.path == "/api/entries/delete":
+            self.handle_delete_entry()
         else:
             self.send_json({"error": "not_found"}, 404)
 
-    def handle_sb_proxy(self):
-        """代理 Supabase API 请求（绕过 GFW）。"""
-        if not SUPABASE_URL:
-            self.send_json({"error": "supabase_not_configured"}, 500)
+    # ── 认证端点 ──
+    def handle_signup(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            self.send_json({"error": "invalid_json"}, 400)
+            return
+        email = body.get("email", "").strip().lower()
+        password = body.get("password", "")
+        if not email or len(password) < 6:
+            self.send_json({"error": "invalid_input"}, 400)
+            return
+
+        cur = db.cursor()
+        cur.execute("SELECT id FROM users WHERE email=?", (email,))
+        if cur.fetchone():
+            self.send_json({"error": "email_exists"}, 409)
+            return
+
+        salt = secrets.token_hex(16)
+        pw_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+        cur.execute("INSERT INTO users (email, pw_hash, salt) VALUES (?,?,?)", (email, pw_hash, salt))
+        db.commit()
+        user_id = cur.lastrowid
+
+        token = secrets.token_hex(32)
+        expires = datetime.now().replace(hour=23, minute=59, second=59).isoformat()  # 当天有效
+        cur.execute("INSERT INTO sessions (user_id, token, expires) VALUES (?,?,?)", (user_id, token, expires))
+        db.commit()
+        self.send_json({"ok": True, "user_id": user_id, "token": token, "email": email})
+
+    def handle_login(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            self.send_json({"error": "invalid_json"}, 400)
+            return
+        email = body.get("email", "").strip().lower()
+        password = body.get("password", "")
+        if not email or not password:
+            self.send_json({"error": "invalid_input"}, 400)
+            return
+
+        cur = db.cursor()
+        cur.execute("SELECT id, pw_hash, salt FROM users WHERE email=?", (email,))
+        row = cur.fetchone()
+        if not row:
+            self.send_json({"error": "invalid_credentials"}, 401)
+            return
+        user_id, pw_hash, salt = row
+        if hashlib.sha256((password + salt).encode()).hexdigest() != pw_hash:
+            self.send_json({"error": "invalid_credentials"}, 401)
+            return
+
+        token = secrets.token_hex(32)
+        expires = datetime.now().replace(hour=23, minute=59, second=59).isoformat()  # 当天有效
+        cur.execute("INSERT INTO sessions (user_id, token, expires) VALUES (?,?,?)", (user_id, token, expires))
+        db.commit()
+        self.send_json({"ok": True, "user_id": user_id, "token": token, "email": email})
+
+    # ── 数据端点 ──
+    def handle_get_entries(self):
+        user_id = self._check_token()
+        if not user_id:
+            self.send_json({"error": "unauthorized"}, 401)
+            return
+        cur = db.cursor()
+        cur.execute("SELECT id, text, prompt, date, edited_at, thread FROM entries WHERE user_id=? ORDER BY date DESC", (user_id,))
+        rows = cur.fetchall()
+        entries = [{"id": r[0], "text": r[1], "prompt": r[2], "date": r[3], "edited_at": r[4], "thread": json.loads(r[5] if r[5] else "[]")} for r in rows]
+        self.send_json(entries)
+
+    def handle_save_entry(self):
+        user_id = self._check_token()
+        if not user_id:
+            self.send_json({"error": "unauthorized"}, 401)
             return
         try:
             length = int(self.headers.get("Content-Length", 0))
@@ -133,34 +223,38 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": "invalid_json"}, 400)
             return
 
-        sb_path = body.get("path", "")
-        sb_method = body.get("method", "GET")
-        sb_body = body.get("body", None)
-        sb_token = body.get("token", "")
+        eid = body.get("id")
+        text = body.get("text", "")
+        prompt = body.get("prompt")
+        date = body.get("date", datetime.now().isoformat())
+        edited_at = body.get("edited_at")
+        thread = json.dumps(body.get("thread", []), ensure_ascii=False)
 
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Content-Type": "application/json",
-        }
-        if sb_token:
-            headers["Authorization"] = f"Bearer {sb_token}"
+        cur = db.cursor()
+        cur.execute("SELECT id FROM entries WHERE id=? AND user_id=?", (eid, user_id))
+        if cur.fetchone():
+            cur.execute("UPDATE entries SET text=?, prompt=?, edited_at=?, thread=? WHERE id=? AND user_id=?", (text, prompt, edited_at, thread, eid, user_id))
+        else:
+            cur.execute("INSERT INTO entries (id, user_id, text, prompt, date, edited_at, thread) VALUES (?,?,?,?,?,?,?)", (eid, user_id, text, prompt, date, edited_at, thread))
+        db.commit()
+        self.send_json({"ok": True})
 
-        url = f"{SUPABASE_URL}{sb_path}"
-        data = json.dumps(sb_body).encode("utf-8") if sb_body else None
-
+    def handle_delete_entry(self):
+        user_id = self._check_token()
+        if not user_id:
+            self.send_json({"error": "unauthorized"}, 401)
+            return
         try:
-            req = urllib.request.Request(url, data=data, headers=headers, method=sb_method)
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-            self.send_json(result, resp.status if hasattr(resp, 'status') else 200)
-        except urllib.error.HTTPError as e:
-            try:
-                err = json.loads(e.read().decode("utf-8"))
-            except Exception:
-                err = {"error": str(e)}
-            self.send_json(err, e.code)
-        except Exception as e:
-            self.send_json({"error": str(e)}, 500)
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            self.send_json({"error": "invalid_json"}, 400)
+            return
+        eid = body.get("id")
+        cur = db.cursor()
+        cur.execute("DELETE FROM entries WHERE id=? AND user_id=?", (eid, user_id))
+        db.commit()
+        self.send_json({"ok": True})
 
     def handle_question(self):
         if not self._check_auth():
@@ -301,6 +395,14 @@ class Handler(SimpleHTTPRequestHandler):
         if "/api/" in str(args[0]):
             print(f"  → API 请求: {args[0]}")
 
+
+# ── 初始化 SQLite 数据库 ──
+db = sqlite3.connect(DB_PATH, check_same_thread=False)
+db.execute("PRAGMA journal_mode=WAL")
+db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, pw_hash TEXT NOT NULL, salt TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))")
+db.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, token TEXT UNIQUE NOT NULL, expires TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id))")
+db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT NOT NULL, prompt TEXT, date TEXT, edited_at TEXT, thread TEXT DEFAULT '[]', FOREIGN KEY(user_id) REFERENCES users(id))")
+db.commit()
 
 if __name__ == "__main__":
     host = "0.0.0.0"

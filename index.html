@@ -586,42 +586,38 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
 }
 
 // ═══════════════════════════════════════
-//  SUPABASE — 通过 Render 代理（绕过 GFW）
+//  ACCOUNT — 自建认证 + 云端数据同步
 // ═══════════════════════════════════════
 let authUser = null;
 let authToken = localStorage.getItem('sizai_auth_token') || null;
+let authEmail = localStorage.getItem('sizai_auth_email') || '';
 
-// 所有 Supabase 请求通过 Render 代理
-async function sbProxy(path, method, body) {
-  const r = await fetch(API_BASE + '/api/supabase', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, method, body, token: authToken }),
-  });
-  return r;
+function dbHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (authToken) h['X-Sizai-Token'] = authToken;
+  return h;
 }
 
 async function checkAuth() {
   if (!authToken) { updateAuthUI(false); return; }
   try {
-    const r = await sbProxy('/auth/v1/user', 'GET');
+    const r = await fetch(API_BASE + '/api/entries?select=id&limit=1', { headers: dbHeaders() });
     if (r.ok) {
-      const u = await r.json();
-      authUser = u;
+      authUser = { email: authEmail };
       updateAuthUI(true);
-      await migrateLocalToCloud();
       const changed = await loadFromCloud();
       if (changed) { renderGarden(); initStars(); refreshUI(); }
     } else {
-      authToken = null; authUser = null;
+      authToken = null; authUser = null; authEmail = '';
       localStorage.removeItem('sizai_auth_token');
+      localStorage.removeItem('sizai_auth_email');
       updateAuthUI(false);
     }
   } catch(e) { updateAuthUI(false); }
@@ -630,8 +626,8 @@ async function checkAuth() {
 function updateAuthUI(loggedIn) {
   const btn = document.getElementById('authBtn');
   if (!btn) return;
-  if (loggedIn && authUser) {
-    btn.textContent = (authUser.email || '').split('@')[0] || '...';
+  if (loggedIn) {
+    btn.textContent = (authEmail || '...').split('@')[0];
     btn.className = 'auth-btn logged-in';
   } else {
     btn.textContent = L==='zh'?'登录':'Login';
@@ -651,30 +647,34 @@ function saveEntries(entries) {
 }
 
 async function cloudSync(action, arg) {
-  if (!authToken || !authUser) return;
+  if (!authToken) return;
   try {
     if (action === 'upsert') {
       const e = arg;
-      const check = await sbProxy('/rest/v1/entries?id=eq.' + e.id + '&select=id', 'GET');
-      const exists = check.ok && (await check.json()).length > 0;
-      await sbProxy(
-        '/rest/v1/entries' + (exists ? '?id=eq.' + e.id : ''),
-        exists ? 'PATCH' : 'POST',
-        { id: e.id, user_id: authUser.id, text: e.text, prompt: e.prompt || null, date: e.date, edited_at: e.editedAt || null, thread: e.thread || [] }
-      );
+      await fetch(API_BASE + '/api/entries', {
+        method: 'POST', headers: dbHeaders(),
+        body: JSON.stringify(e),
+      });
     } else if (action === 'delete') {
-      await sbProxy('/rest/v1/entries?id=eq.' + arg, 'DELETE');
+      await fetch(API_BASE + '/api/entries/delete', {
+        method: 'POST', headers: dbHeaders(),
+        body: JSON.stringify({ id: arg }),
+      });
     }
-  } catch(e) { console.log('Sync error:', e); }
+  } catch(e) {}
 }
 
 async function loadFromCloud() {
-  if (!authToken || !authUser) return false;
+  if (!authToken) return false;
   try {
-    const r = await sbProxy('/rest/v1/entries?select=id,text,prompt,date,edited_at,thread&order=date.desc', 'GET');
+    const r = await fetch(API_BASE + '/api/entries', { headers: dbHeaders() });
     if (r.ok) {
       const data = await r.json();
-      saveEntries(data.map(e => ({ id: e.id, text: e.text, prompt: e.prompt, date: e.date, editedAt: e.edited_at, thread: e.thread || [] })));
+      saveEntries(data.map(e => ({
+        id: e.id, text: e.text, prompt: e.prompt,
+        date: e.date, editedAt: e.edited_at,
+        thread: e.thread || [],
+      })));
       return true;
     }
   } catch(e) {}
@@ -682,7 +682,7 @@ async function loadFromCloud() {
 }
 
 async function migrateLocalToCloud() {
-  if (!authToken || !authUser) { localStorage.setItem('sizai_migrated', '1'); return; }
+  if (!authToken) { localStorage.setItem('sizai_migrated', '1'); return; }
   if (localStorage.getItem('sizai_migrated')) return;
   const local = getEntries();
   if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
@@ -696,9 +696,9 @@ function openAuth() {
   const isZh = L === 'zh';
   if (authUser) {
     // 已登录 → 退出
-    authToken = null; authUser = null;
+    authToken = null; authUser = null; authEmail = '';
     localStorage.removeItem('sizai_auth_token');
-    saveEntries([]);  // 清空本地缓存
+    localStorage.removeItem('sizai_auth_email');
     updateAuthUI(false);
     renderGarden(); initStars();
     toast(isZh?'已退出':'Signed out');
@@ -727,45 +727,54 @@ async function doAuth() {
   if (password.length < 6) { toast(isZh?'密码至少6位':'Password must be 6+ chars'); return; }
 
   try {
-    // 尝试登录
-    let r = await sbProxy('/auth/v1/token?grant_type=password', 'POST', { email, password });
+    // 先登录
+    let r = await fetch(API_BASE + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
     if (!r.ok) {
-      // 登录失败 → 尝试注册
-      r = await sbProxy('/auth/v1/signup', 'POST', { email, password });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        const msg = err.msg || err.message || ('HTTP ' + r.status);
-        if (msg.includes('over_email_send_rate_limit') || msg.includes('email rate')) {
-          toast(isZh?'发送太频繁，请稍后再试':'Too many attempts, wait a moment');
-        } else {
-          toast(msg);
+      const err = await r.json().catch(() => ({}));
+      if (err.error === 'invalid_credentials') {
+        // 登录失败 → 尝试注册
+        r = await fetch(API_BASE + '/api/auth/signup', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!r.ok) {
+          const e2 = await r.json().catch(() => ({}));
+          if (e2.error === 'email_exists') {
+            toast(isZh?'该邮箱已注册，密码错误':'Email exists, wrong password');
+          } else {
+            toast(e2.error || (isZh?'注册失败':'Signup failed'));
+          }
+          return;
         }
+        // 注册即登录
+        const signupData = await r.json();
+        authToken = signupData.token;
+        authEmail = email;
+      } else {
+        toast(err.error || (isZh?'登录失败':'Login failed'));
         return;
       }
-      // 注册成功 → 再登录
-      const signupData = await r.json().catch(() => ({}));
-      // Check if email confirmation is needed
-      if (signupData.identities && signupData.identities.length === 0) {
-        toast(isZh?'该邮箱已注册，请直接登录':'Email already registered. Please log in.');
-        return;
-      }
-      r = await sbProxy('/auth/v1/token?grant_type=password', 'POST', { email, password });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        toast(err.msg || err.message || (isZh?'注册后登录失败':'Login after signup failed'));
-        return;
-      }
-    }
-    const data = await r.json();
-    if (data.access_token) {
-      authToken = data.access_token;
-      authUser = data.user;
-      localStorage.setItem('sizai_auth_token', authToken);
-      closeModal();
-      await checkAuth();
-      toast(isZh?'已登录 ✓':'Logged in ✓');
     } else {
-      toast(data.error_description || data.msg || (isZh?'未知错误':'Unknown error'));
+      const loginData = await r.json();
+      authToken = loginData.token;
+      authEmail = email;
+    }
+
+    if (authToken) {
+      authUser = { email: authEmail };
+      localStorage.setItem('sizai_auth_token', authToken);
+      localStorage.setItem('sizai_auth_email', authEmail);
+      closeModal();
+      await migrateLocalToCloud();
+      await loadFromCloud();
+      updateAuthUI(true);
+      renderGarden();
+      initStars();
+      refreshUI();
+      toast(isZh?'已登录 ✓':'Logged in ✓');
     }
   } catch(e) {
     toast((isZh?'网络错误：':'Network error: ') + (e.message || e));
