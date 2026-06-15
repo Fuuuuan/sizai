@@ -44,24 +44,16 @@ REPLY_SYSTEM_PROMPT = """你是一位严肃的哲学对话者。你来这里不�
 
 你的姿态像一位好的学术讨论者：认真、诚实、对自己和对方都有智识上的要求。"""
 
-SYSTEM_PROMPT = """你每次生成一个值得讨论的问题。生成前先默念：这个人要在咖啡馆里对着我读出这个问题——如果我自己听了会觉得尴尬，就别用。
+SYSTEM_PROMPT = """你生成一个值得讨论的问题。必须用大白话，一个人对另一个人说出来的那种。
 
-禁止项（碰了就重写）：
-- 禁止比喻和意象：河流、镜子、碎片、星辰、迷雾、深渊、回响、倒影——这些词一个都别用
-- 禁止反问句式开头："你是否曾经…""你有没有想过…""如果…那么…"——太像公众号标题
-- 禁止抽象大词堆砌："存在的本质""意识的深渊""虚无的边界"——听不懂
+禁止：比喻、意象、对偶句、反问句式。碰了就删掉重写。
 
-要做的：
-- 用一个人真的会对朋友说出来的话。具体的人，具体的情境
-- 问完对方不需要任何"哲学知识"就能开始想、开始讨论
-- 问题背后自然藏着一个哲学母题，但不要把它写在脸上
-
-范例（照这个感觉写）：
+范例：
 - "你最好的朋友做了你认为是错的事。你应该站在朋友这边，还是站在你认为对的那边？"
 - "如果可以提前知道你的一生会发生什么，你还会选择出生吗？"
+- "你现在的性格，有多少是自己选的，有多少是环境替你选的？"
 
-直接返回JSON：
-{"q": "问题文本", "src": "—— 来源标注"}"""
+返回JSON：{"q": "问题", "src": "—— 来源"}"""
 
 
 def _deepseek(messages, max_tokens=600, model="deepseek-chat", temperature=None):
@@ -89,8 +81,8 @@ def generate_question():
     """调用 DeepSeek API 生成一个全新的哲学问题。"""
     text = _deepseek([
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": "请生成一个全新的哲学问题。"},
-    ], max_tokens=200, temperature=0.4)
+        {"role": "user", "content": "给我一个值得想想的问题。用大白话。不要修饰。"},
+    ], max_tokens=200, temperature=0.3)
     # Parse the JSON from the response (handle possible markdown wrapping)
     text = text.strip()
     if text.startswith("```"):
