@@ -1894,7 +1894,7 @@ async function sendToClaude() {
       const resp = await fetch(`${API_BASE}/api/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ text, prompt, history: threadHistory }),
+        body: JSON.stringify({ text, prompt, history: threadHistory, source: currentQuestion ? (L==='zh' ? currentQuestion.src : (currentQuestion.enSrc || currentQuestion.src)) : null }),
         signal: AbortSignal.timeout(65000),
       });
       const data = await resp.json();
@@ -2015,7 +2015,8 @@ async function sendThreadMessage(id) {
         body: JSON.stringify({
           text: newMsg,
           prompt: entry.prompt || '',
-          history: history
+          history: history,
+          source: null
         }),
         signal: AbortSignal.timeout(65000),
       });

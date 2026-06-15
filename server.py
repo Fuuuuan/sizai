@@ -290,6 +290,7 @@ class Handler(SimpleHTTPRequestHandler):
         text = body.get("text", "").strip()
         prompt = body.get("prompt", "")
         history = body.get("history", None)
+        source = body.get("source", "")
         if not text:
             self.send_json({"error": "empty_text"}, 400)
             return
@@ -307,20 +308,25 @@ class Handler(SimpleHTTPRequestHandler):
         print(f"  ✦ 收到思辨文字 ({len(text)} 字)")
 
         # Generate AI reply via DeepSeek
-        reply = self.generate_reply(text, prompt, history)
+        reply = self.generate_reply(text, prompt, history, source)
         if reply:
             self.send_json({"ok": True, "chars": len(text), "reply": reply})
         else:
             self.send_json({"ok": True, "chars": len(text), "reply_fallback": True})
 
-    def generate_reply(self, text, prompt, history=None):
+    def generate_reply(self, text, prompt, history=None, source=None):
         """Use DeepSeek API to generate a philosophical reply."""
         if not DEEPSEEK_KEY:
             print("  ⚠ 未设置 DEEPSEEK_API_KEY，跳过 AI 回复")
             return None
 
-        # 构建消息数组：system + 历史 + 当前用户消息
-        messages = [{"role": "system", "content": REPLY_SYSTEM_PROMPT}]
+        # 构建提示词：如果有来源标注，引导从该传统出发
+        system = REPLY_SYSTEM_PROMPT
+        if source and source.strip():
+            system += f"\n\n注意：用户正在回应的问题来自 {source.strip()}。你可以从这个哲学传统或相关思想出发开始讨论，但不限于此——如果对话自然走向其他方向，顺其自然。"
+
+        # 构建消息数组
+        messages = [{"role": "system", "content": system}]
 
         if history:
             for msg in history:
