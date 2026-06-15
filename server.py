@@ -44,16 +44,16 @@ REPLY_SYSTEM_PROMPT = """你是一位严肃的哲学对话者。你来这里不�
 
 你的姿态像一位好的学术讨论者：认真、诚实、对自己和对方都有智识上的要求。"""
 
-SYSTEM_PROMPT = """你是一位哲学导师，擅长提出引人深思的问题。
+SYSTEM_PROMPT = """你提出引人深思的哲学问题。
 
-请生成一个哲学思辨问题，要求：
-1. 用中文表达，语言优美，像一首短诗或箴言
-2. 触及存在、意识、时间、自由、爱、死亡、美、语言、真实、自我等哲学母题
-3. 问题本身要让人停下来，感到一种"被击中"的感觉
-4. 不要陈词滥调，不要教科书式的问题
-5. 同时返回一个简短的"来源标注"（3-8个字），标明这个问题与哪个哲学传统或思想家有关联，格式如"—— 海德格尔与存在"或"—— 庄子与逍遥"
+要求：
+1. 用日常中文，自然口语化。像朋友聊天时突然抛出的问题，不要像诗、箴言或学术论文
+2. 问题要具体、可理解——读完就知道在问什么，不需要猜
+3. 触及存在、意识、时间、自由、爱、死亡、美、真实、自我等哲学母题，但用生活化的切入点，比如从日常场景出发
+4. 不要掉书袋，不要"被击中"式的修辞，靠问题本身的力量，不靠语言花招
+5. 附带简短来源标注（3-8字），标明与哪个哲学传统相关，如"—— 海德格尔与存在"
 
-请直接返回 JSON 格式：
+直接返回JSON：
 {"q": "问题文本", "src": "—— 来源标注"}"""
 
 
@@ -399,12 +399,16 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 # ── 初始化 SQLite 数据库 ──
-db = sqlite3.connect(DB_PATH, check_same_thread=False)
-db.execute("PRAGMA journal_mode=WAL")
-db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, pw_hash TEXT NOT NULL, salt TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))")
-db.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, token TEXT UNIQUE NOT NULL, expires TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id))")
-db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT NOT NULL, prompt TEXT, date TEXT, edited_at TEXT, thread TEXT DEFAULT '[]', FOREIGN KEY(user_id) REFERENCES users(id))")
-db.commit()
+def _init_db():
+    db = sqlite3.connect(DB_PATH, check_same_thread=False)
+    db.execute("PRAGMA journal_mode=WAL")
+    db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, pw_hash TEXT NOT NULL, salt TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))")
+    db.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, token TEXT UNIQUE NOT NULL, expires TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id))")
+    db.execute("CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT NOT NULL, prompt TEXT, date TEXT, edited_at TEXT, thread TEXT DEFAULT '[]', FOREIGN KEY(user_id) REFERENCES users(id))")
+    db.commit()
+    return db
+
+db = _init_db()
 
 # ── Gist 备份/恢复 ──
 def _backup_to_gist():
@@ -466,8 +470,12 @@ def _auto_backup():
 threading.Thread(target=_auto_backup, daemon=True).start()
 
 if __name__ == "__main__":
-    # 启动时尝试恢复
-    _restore_from_gist()
+    # 启动时尝试恢复，然后重新打开 DB
+    if _restore_from_gist():
+        global db
+        db.close()
+        db = _init_db()
+        print("  ✓ 数据库已从 Gist 恢复")
     host = "0.0.0.0"
     port = int(os.environ.get("PORT", "8899"))
     print("=" * 50)
