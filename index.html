@@ -588,7 +588,7 @@ const T = {
     toast_ai_fail: '生成失败，使用本地题库',
     toast_claude_replied: '已追加到星辰 ✦ Claude 已回复',
     toast_claude_wait: '已追加到星辰 · 等待 Claude 回复',
-    toast_claude_saved: '已存入星辰 · 在电脑上继续对话',
+    toast_claude_saved: '已存入星辰 · 可稍后继续对话',
     toast_thread_replied: '🌿 Claude 已回复',
     toast_thread_sent: '已发送 · 等待回复',
     toast_copied: '已复制到剪贴板 · 粘贴到 Claude 对话中',
@@ -608,7 +608,7 @@ const T = {
     modal_close: '关闭',
     modal_edit_text: '✎ 编辑文字',
     modal_send: '↗ 发送',
-    modal_offline_hint: '在电脑上打开思在，连接 Claude 继续这段对话',
+    modal_offline_hint: '服务器连接中，请稍候…',
     thread_you: '💭 你',
     thread_claude: '🌿 Claude',
     thread_expand: '展开',
@@ -650,7 +650,7 @@ const T = {
     toast_ai_fail: 'Generation failed, using local library',
     toast_claude_replied: 'Added to star ✦ Claude replied',
     toast_claude_wait: 'Added to star · Awaiting Claude',
-    toast_claude_saved: 'Saved to star · Continue on computer',
+    toast_claude_saved: 'Saved to star · Continue later',
     toast_thread_replied: '🌿 Claude replied',
     toast_thread_sent: 'Sent · Awaiting reply',
     toast_copied: 'Copied · Paste into Claude',
@@ -670,7 +670,7 @@ const T = {
     modal_close: 'Close',
     modal_edit_text: '✎ Edit Text',
     modal_send: '↗ Send',
-    modal_offline_hint: 'Open 思在 on your computer to continue this dialogue with Claude',
+    modal_offline_hint: 'Connecting to server, please wait…',
     thread_you: '💭 You',
     thread_claude: '🌿 Claude',
     thread_expand: 'Expand',
@@ -1181,7 +1181,7 @@ function showAuthPrompt() {
 async function fetchFromAPI() {
   const resp = await fetch(`${API_BASE}/api/question`, {
     headers: authHeaders(),
-    signal: AbortSignal.timeout(8000)
+    signal: AbortSignal.timeout(50000)  // Render 冷启动需要时间
   });
   if (!resp.ok) throw new Error('API error');
   const data = await resp.json();
