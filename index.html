@@ -586,7 +586,7 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
@@ -729,54 +729,70 @@ function openAuth() {
 }
 
 async function doAuth() {
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  if (!email || !password) { toast(L==='zh'?'请填写邮箱和密码':'Fill in both fields'); return; }
-  if (password.length < 6) { toast(L==='zh'?'密码至少6位':'Password must be 6+ chars'); return; }
-
   const isZh = L === 'zh';
-  // 尝试登录
-  let r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-    method: 'POST',
-    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!r.ok) {
-    // 登录失败 → 尝试注册
-    r = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+  const emailEl = document.getElementById('authEmail');
+  const passwordEl = document.getElementById('authPassword');
+  if (!emailEl || !passwordEl) { toast('UI error'); return; }
+  const email = emailEl.value.trim();
+  const password = passwordEl.value;
+  if (!email || !password) { toast(isZh?'请填写邮箱和密码':'Fill in both fields'); return; }
+  if (password.length < 6) { toast(isZh?'密码至少6位':'Password must be 6+ chars'); return; }
+
+  try {
+    // 尝试登录
+    let r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
       method: 'POST',
       headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
     if (!r.ok) {
-      const err = await r.json();
-      toast(err.msg || err.message || (isZh?'注册失败':'Signup failed'));
-      return;
+      // 登录失败 → 尝试注册
+      r = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        const msg = err.msg || err.message || ('HTTP ' + r.status);
+        if (msg.includes('over_email_send_rate_limit') || msg.includes('email rate')) {
+          toast(isZh?'发送太频繁，请稍后再试':'Too many attempts, wait a moment');
+        } else {
+          toast(msg);
+        }
+        return;
+      }
+      // 注册成功 → 再登录
+      const signupData = await r.json().catch(() => ({}));
+      // Check if email confirmation is needed
+      if (signupData.identities && signupData.identities.length === 0) {
+        toast(isZh?'该邮箱已注册，请直接登录':'Email already registered. Please log in.');
+        return;
+      }
+      r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        toast(err.msg || err.message || (isZh?'注册后登录失败':'Login after signup failed'));
+        return;
+      }
     }
-    // 注册成功 → 再登录
-    r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-  }
-  const data = await r.json();
-  if (data.access_token) {
-    authToken = data.access_token;
-    authUser = data.user;
-    localStorage.setItem('sizai_auth_token', authToken);
-    closeModal();
-    await checkAuth();
-    toast(isZh?'已登录 ✓':'Logged in ✓');
-  } else {
-    const msg = data.msg || data.message || '';
-    if (msg.includes('not confirmed') || msg.includes('verify')) {
-      toast(isZh?'请先去邮箱确认注册链接':'Please confirm your email first');
-    } else if (msg.includes('Invalid login')) {
-      toast(isZh?'邮箱或密码错误':'Invalid email or password');
+    const data = await r.json();
+    if (data.access_token) {
+      authToken = data.access_token;
+      authUser = data.user;
+      localStorage.setItem('sizai_auth_token', authToken);
+      closeModal();
+      await checkAuth();
+      toast(isZh?'已登录 ✓':'Logged in ✓');
     } else {
-      toast(msg || (isZh?'登录失败，请重试':'Login failed, please retry'));
+      toast(data.error_description || data.msg || (isZh?'未知错误':'Unknown error'));
     }
+  } catch(e) {
+    toast((isZh?'网络错误：':'Network error: ') + (e.message || e));
   }
 }
 
