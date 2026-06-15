@@ -64,15 +64,18 @@ SYSTEM_PROMPT = """你每次生成一个值得讨论的问题。生成前先默�
 {"q": "问题文本", "src": "—— 来源标注"}"""
 
 
-def _deepseek(messages, max_tokens=600, model="deepseek-chat"):
+def _deepseek(messages, max_tokens=600, model="deepseek-chat", temperature=None):
     """Call DeepSeek API (OpenAI-compatible)."""
     if not DEEPSEEK_KEY:
         raise ValueError("未设置 DEEPSEEK_API_KEY")
-    body = json.dumps({
+    payload = {
         "model": model,
         "max_tokens": max_tokens,
         "messages": messages,
-    }).encode("utf-8")
+    }
+    if temperature is not None:
+        payload["temperature"] = temperature
+    body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(DEEPSEEK_URL, data=body, headers={
         "Authorization": f"Bearer {DEEPSEEK_KEY}",
         "Content-Type": "application/json",
@@ -87,7 +90,7 @@ def generate_question():
     text = _deepseek([
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "请生成一个全新的哲学问题。"},
-    ], max_tokens=200)
+    ], max_tokens=200, temperature=0.4)
     # Parse the JSON from the response (handle possible markdown wrapping)
     text = text.strip()
     if text.startswith("```"):
