@@ -105,6 +105,20 @@
     border-color: rgba(212,168,84,0.3);
     color: var(--accent);
   }
+  .auth-btn {
+    position: absolute; top: 16px; left: 20px;
+    z-index: 10;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(200,200,220,0.4);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem; cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.2s;
+  }
+  .auth-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .auth-btn.logged-in { color: rgba(140,200,160,0.6); border-color: rgba(140,200,160,0.2); }
   .sync-btn {
     position: absolute; top: 16px; left: 20px;
     z-index: 10;
@@ -472,6 +486,7 @@
 <meta name="apple-mobile-web-app-title" content="思在">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><rect width='180' height='180' rx='36' fill='%230a0a0f'/><text x='90' y='115' text-anchor='middle' font-size='100' font-family='serif'>🌿</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -479,7 +494,7 @@
 
 <div id="app">
   <header>
-    <button class="sync-btn" id="syncBtn" onclick="openSettings()" title="Sync settings">☁</button>
+    <button class="auth-btn" id="authBtn" onclick="openAuth()">登录</button>
     <div class="lang-toggle" id="langToggle">
       <button onclick="switchLang('zh')" id="btnZh">中</button>
       <button onclick="switchLang('en')" id="btnEn">EN</button>
@@ -562,10 +577,188 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
+}
+
+// ═══════════════════════════════════════
+//  SUPABASE — 云端数据库 + 用户认证
+// ═══════════════════════════════════════
+// 部署前替换为你的 Supabase 项目 URL 和 anon key
+const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+const SUPABASE_KEY = 'YOUR_ANON_KEY';
+let supabase = null;
+let authUser = null;
+
+try {
+  if (SUPABASE_URL.includes('YOUR_PROJECT')) {
+    console.log('⚠ Supabase 未配置，使用本地存储');
+  } else if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+} catch(e) {}
+
+async function checkAuth() {
+  if (!supabase) return;
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      authUser = data.session.user;
+      document.getElementById('authBtn').textContent = authUser.email.split('@')[0];
+      document.getElementById('authBtn').className = 'auth-btn logged-in';
+      await migrateLocalToCloud();
+      const changed = await loadFromCloud();
+      if (changed) { renderGarden(); initStars(); refreshUI(); }
+    } else {
+      authUser = null;
+      document.getElementById('authBtn').textContent = L==='zh'?'登录':'Login';
+      document.getElementById('authBtn').className = 'auth-btn';
+    }
+  } catch(e) {}
+}
+
+async function migrateLocalToCloud() {
+  if (!supabase || !authUser) return;
+  const migrated = localStorage.getItem('sizai_migrated');
+  if (migrated) return;
+  const local = getEntriesLocal();
+  if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
+  // 上传本地数据到云端
+  for (const e of local) {
+    await supabase.from('entries').upsert({
+      id: e.id, user_id: authUser.id,
+      text: e.text, prompt: e.prompt || null,
+      date: e.date, edited_at: e.editedAt || null,
+      thread: e.thread || [],
+    });
+  }
+  localStorage.setItem('sizai_migrated', '1');
+}
+
+async function loadFromCloud() {
+  if (!supabase || !authUser) return;
+  const { data } = await supabase.from('entries').select('*').order('date', { ascending: false });
+  if (data) {
+    const entries = data.map(e => ({
+      id: e.id, text: e.text, prompt: e.prompt,
+      date: e.date, editedAt: e.edited_at,
+      thread: e.thread || [],
+    }));
+    localStorage.setItem('sizai_entries', JSON.stringify(entries));
+    renderGarden();
+    initStars();
+  }
+}
+
+// ── 数据层：Supabase（登录时）或 localStorage（未登录）──
+// 用本地缓存同步，getEntries() 保持同步，不破坏已有代码
+
+function getEntries() {
+  try { return JSON.parse(localStorage.getItem('sizai_entries')) || []; }
+  catch(e) { return []; }
+}
+
+function saveEntries(entries) {
+  localStorage.setItem('sizai_entries', JSON.stringify(entries));
+}
+
+async function cloudSync(action, entry) {
+  // 云端操作 + 同步本地缓存
+  if (!supabase || !authUser) return;
+  try {
+    if (action === 'upsert') {
+      await supabase.from('entries').upsert({
+        id: entry.id, user_id: authUser.id,
+        text: entry.text, prompt: entry.prompt || null,
+        date: entry.date, edited_at: entry.editedAt || null,
+        thread: entry.thread || [],
+      });
+    } else if (action === 'delete') {
+      await supabase.from('entries').delete().eq('id', entry).eq('user_id', authUser.id);
+    }
+  } catch(e) { console.log('Cloud sync error:', e); }
+}
+
+async function loadFromCloud() {
+  if (!supabase || !authUser) return false;
+  try {
+    const { data } = await supabase.from('entries').select('id,text,prompt,date,edited_at,thread').order('date', { ascending: false });
+    if (data) {
+      const entries = data.map(e => ({
+        id: e.id, text: e.text, prompt: e.prompt,
+        date: e.date, editedAt: e.edited_at,
+        thread: e.thread || [],
+      }));
+      saveEntries(entries);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+async function migrateLocalToCloud() {
+  if (!supabase || !authUser) return;
+  const migrated = localStorage.getItem('sizai_migrated');
+  if (migrated) return;
+  const local = getEntries();
+  if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
+  for (const e of local) {
+    await cloudSync('upsert', e);
+  }
+  localStorage.setItem('sizai_migrated', '1');
+}
+
+function openAuth() {
+  if (!supabase) { toast('Supabase not configured'); return; }
+  if (authUser) {
+    // 已登录 → 退出
+    supabase.auth.signOut().then(() => {
+      authUser = null;
+      document.getElementById('authBtn').textContent = L==='zh'?'登录':'Login';
+      document.getElementById('authBtn').className = 'auth-btn';
+      toast(L==='zh'?'已退出':'Signed out');
+    });
+    return;
+  }
+  const isZh = L === 'zh';
+  document.getElementById('modalContent').innerHTML =
+    '<div style="font-size:1rem; color:var(--text-bright); margin-bottom:12px;">' + (isZh?'登录 / 注册':'Login / Sign Up') + '</div>'
+    + '<p style="font-size:0.78rem; color:rgba(200,200,220,0.5); margin-bottom:14px;">' + (isZh?'输入邮箱和密码。新用户自动注册。':'Enter email and password. New users are auto-registered.') + '</p>'
+    + '<input id="authEmail" type="email" style="width:100%; background:rgba(10,10,20,0.5); border:1px solid var(--border); border-radius:8px; padding:10px; color:var(--text); font-size:0.85rem; outline:none; margin-bottom:8px;" placeholder="email@example.com">'
+    + '<input id="authPassword" type="password" style="width:100%; background:rgba(10,10,20,0.5); border:1px solid var(--border); border-radius:8px; padding:10px; color:var(--text); font-size:0.85rem; outline:none; margin-bottom:12px;" placeholder="' + (isZh?'密码 (6位以上)':'Password (6+ chars)') + '">'
+    + '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
+    + '<button class="btn primary" onclick="doAuth()">' + (isZh?'登录 / 注册':'Login / Sign Up') + '</button>'
+    + '<button class="close-btn" onclick="closeModal()" style="margin-left:auto;">' + (isZh?'关闭':'Close') + '</button>'
+    + '</div>';
+  document.getElementById('modalOverlay').style.display = 'flex';
+}
+
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { toast(L==='zh'?'请填写邮箱和密码':'Fill in both fields'); return; }
+  if (password.length < 6) { toast(L==='zh'?'密码至少6位':'Password must be 6+ chars'); return; }
+
+  // 先尝试登录
+  let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    // 登录失败 → 尝试注册
+    const { error: signUpError } = await supabase.auth.signUp({ email, password });
+    if (signUpError) {
+      toast(signUpError.message);
+      return;
+    }
+    // 注册成功 → 自动登录
+    const { data: d2 } = await supabase.auth.signInWithPassword({ email, password });
+    data = d2;
+  }
+  if (data && data.session) {
+    closeModal();
+    await checkAuth();
+    toast(L==='zh'?'已登录 ✓':'Logged in ✓');
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1308,29 +1501,30 @@ function saveEntry() {
   const text = document.getElementById('writeArea').value.trim();
   if (!text) { toast('先写点什么吧'); return; }
   const entries = getEntries();
+  let savedEntry = null;
 
   if (editingId) {
-    // 编辑模式：更新已有条目
     const idx = entries.findIndex(e => e.id === editingId);
     if (idx >= 0) {
       entries[idx].text = text;
       if (currentPrompt) entries[idx].prompt = currentPrompt;
       entries[idx].editedAt = new Date().toISOString();
+      savedEntry = entries[idx];
       toast('已更新 ✦ 星辰被重新点亮');
     }
   } else {
-    // 新建模式
-    entries.unshift({
-      id: Date.now(),
-      text,
+    const newEntry = {
+      id: Date.now(), text,
       prompt: currentPrompt || null,
       date: new Date().toISOString(),
-    });
+    };
+    entries.unshift(newEntry);
+    savedEntry = newEntry;
     toast('已保存 ✦ 它已经变成一颗星');
   }
 
-  localStorage.setItem('sizai_entries', JSON.stringify(entries));
-  syncAutoSave();
+  saveEntries(entries);
+  if (savedEntry) cloudSync('upsert', savedEntry);
   clearWrite();
   initStars();
 }
@@ -1356,8 +1550,8 @@ function clearSearch() {
 function deleteEntry(id) {
   let entries = getEntries();
   entries = entries.filter(e => e.id !== id);
-  localStorage.setItem('sizai_entries', JSON.stringify(entries));
-  syncAutoSave();
+  saveEntries(entries);
+  cloudSync('delete', id);
   renderGarden();
   initStars();
   toast('已删除');
@@ -1649,6 +1843,7 @@ async function sendToClaude() {
   }
 
   const entries = getEntries();
+  let cloudEntry = null;
   if (editingId) {
     const idx = entries.findIndex(e => e.id === editingId);
     if (idx >= 0) {
@@ -1660,20 +1855,16 @@ async function sendToClaude() {
       entries[idx].thread.push(...newMsgs);
       entries[idx].text = text;
       entries[idx].editedAt = now;
+      cloudEntry = entries[idx];
     }
   } else {
     const newId = Date.now();
-    entries.unshift({
-      id: newId,
-      text,
-      prompt: prompt || null,
-      date: now,
-      thread: newMsgs,
-    });
-    editingId = newId;  // 新建后自动进入继续模式
+    cloudEntry = { id: newId, text, prompt: prompt || null, date: now, thread: newMsgs };
+    entries.unshift(cloudEntry);
+    editingId = newId;
   }
-  localStorage.setItem('sizai_entries', JSON.stringify(entries));
-  syncAutoSave();
+  saveEntries(entries);
+  if (cloudEntry) cloudSync('upsert', cloudEntry);
 
   // ── 不清空面板，切换到继续对话模式 ──
   document.getElementById('writeArea').value = '';
@@ -1760,9 +1951,9 @@ async function sendThreadMessage(id) {
     entry.thread.push({ role: 'claude', text: reply, date: new Date().toISOString() });
   }
 
-  localStorage.setItem('sizai_entries', JSON.stringify(entries));
-  syncAutoSave();
-  openEntry(id);  // 刷新弹窗
+  saveEntries(entries);
+  cloudSync('upsert', entry);
+  openEntry(id);
 
   if (reply) {
     toast('🌿 Claude 已回复');
@@ -2057,12 +2248,8 @@ if (navigator.storage && navigator.storage.persist) {
   });
 }
 
-// ── 启动时同步 ──
-if (syncToken) {
-  syncDownload().then(changed => {
-    if (changed) { renderGarden(); initStars(); refreshUI(); }
-  });
-}
+// ── 启动时检查登录状态 ──
+checkAuth();
 </script>
 </body>
 </html>
