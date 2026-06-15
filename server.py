@@ -488,7 +488,6 @@ threading.Thread(target=_auto_backup, daemon=True).start()
 if __name__ == "__main__":
     # 启动时尝试恢复，然后重新打开 DB
     if _restore_from_gist():
-        global db
         db.close()
         db = _init_db()
         print("  ✓ 数据库已从 Gist 恢复")
