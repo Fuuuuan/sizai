@@ -9,6 +9,11 @@ import os
 import urllib.request
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """多线程服务器，支持并发请求。"""
+    daemon_threads = True
 
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "")
@@ -268,7 +273,7 @@ if __name__ == "__main__":
     print(f"  → 服务器启动在: http://{host}:{port}")
     print("=" * 50)
 
-    server = HTTPServer((host, port), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
