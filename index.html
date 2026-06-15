@@ -717,26 +717,52 @@ async function loadFromCloud() {
 }
 
 async function migrateLocalToCloud() {
-  if (!authToken) { localStorage.setItem('sizai_migrated', '1'); return; }
-  if (localStorage.getItem('sizai_migrated')) return;
+  if (!authToken) return;
   const local = getEntries();
-  if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
+  if (local.length === 0) return;
+  let uploaded = 0;
   for (const e of local) {
-    await cloudSync('upsert', e);
+    try {
+      await cloudSync('upsert', e);
+      uploaded++;
+    } catch(x) {}
   }
-  localStorage.setItem('sizai_migrated', '1');
+  if (uploaded > 0) console.log('Uploaded ' + uploaded + ' entries to cloud');
+}
+
+function doLogout() {
+  closeModal();
+  authToken = null; authUser = null; authEmail = '';
+  localStorage.removeItem('sizai_auth_token');
+  localStorage.removeItem('sizai_auth_email');
+  updateAuthUI(false);
+  renderGarden(); initStars();
+  toast(L==='zh'?'已退出':'Signed out');
+}
+
+async function forceSyncNow() {
+  if (!authToken) { toast(L==='zh'?'请先登录':'Please log in first'); return; }
+  toast(L==='zh'?'同步中…':'Syncing…');
+  await migrateLocalToCloud();
+  const changed = await loadFromCloud();
+  if (changed) { renderGarden(); initStars(); refreshUI(); }
+  toast(L==='zh'?'同步完成':'Synced');
 }
 
 function openAuth() {
   const isZh = L === 'zh';
   if (authUser) {
-    // 已登录 → 退出
-    authToken = null; authUser = null; authEmail = '';
-    localStorage.removeItem('sizai_auth_token');
-    localStorage.removeItem('sizai_auth_email');
-    updateAuthUI(false);
-    renderGarden(); initStars();
-    toast(isZh?'已退出':'Signed out');
+    // 已登录 → 显示账号信息和操作
+    document.getElementById('modalContent').innerHTML =
+      '<div style="font-size:1rem; color:var(--text-bright); margin-bottom:8px;">' + authEmail + '</div>'
+      + '<p style="font-size:0.78rem; color:rgba(140,200,160,0.5); margin-bottom:14px;">' + (isZh?'已登录 ✓':'Logged in ✓') + '</p>'
+      + '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
+      + '<button class="btn primary" onclick="closeModal();forceSyncNow()">🔄 ' + (isZh?'立即同步':'Sync Now') + '</button>'
+      + '<button class="btn" onclick="exportData()">📥 ' + (isZh?'导出':'Export') + '</button>'
+      + '<button class="btn" onclick="importData()">📤 ' + (isZh?'导入':'Import') + '</button>'
+      + '<button class="btn" onclick="doLogout()" style="border-color:rgba(200,100,100,0.3);color:rgba(200,120,120,0.6);margin-left:auto;">' + (isZh?'退出':'Logout') + '</button>'
+      + '</div>';
+    document.getElementById('modalOverlay').style.display = 'flex';
     return;
   }
   document.getElementById('modalContent').innerHTML =
