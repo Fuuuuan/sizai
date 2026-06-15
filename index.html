@@ -586,30 +586,32 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
 }
 
 // ═══════════════════════════════════════
-//  SUPABASE — 云端数据库 + 用户认证（纯 REST API，零外部依赖）
+//  SUPABASE — 通过 Render 代理（绕过 GFW）
 // ═══════════════════════════════════════
-const SUPABASE_URL = 'https://yvphvjhxjwdizwloqengv.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2cHZoanhqd2Rpd3psb3Flbmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0ODQyNTUsImV4cCI6MjA5NzA2MDI1NX0.jUSRwz_DWJbM4Z1xs46eGiRpZ0arau0hTtC-PmNAL-g';
 let authUser = null;
 let authToken = localStorage.getItem('sizai_auth_token') || null;
 
-function sbHeaders() {
-  const h = { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' };
-  if (authToken) h['Authorization'] = 'Bearer ' + authToken;
-  return h;
+// 所有 Supabase 请求通过 Render 代理
+async function sbProxy(path, method, body) {
+  const r = await fetch(API_BASE + '/api/supabase', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, method, body, token: authToken }),
+  });
+  return r;
 }
 
 async function checkAuth() {
   if (!authToken) { updateAuthUI(false); return; }
   try {
-    const r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: sbHeaders() });
+    const r = await sbProxy('/auth/v1/user', 'GET');
     if (r.ok) {
       const u = await r.json();
       authUser = u;
@@ -618,7 +620,6 @@ async function checkAuth() {
       const changed = await loadFromCloud();
       if (changed) { renderGarden(); initStars(); refreshUI(); }
     } else {
-      // Token expired
       authToken = null; authUser = null;
       localStorage.removeItem('sizai_auth_token');
       updateAuthUI(false);
@@ -654,23 +655,15 @@ async function cloudSync(action, arg) {
   try {
     if (action === 'upsert') {
       const e = arg;
-      // 先查是否存在
-      const check = await fetch(SUPABASE_URL + '/rest/v1/entries?id=eq.' + e.id + '&select=id', { headers: sbHeaders() });
+      const check = await sbProxy('/rest/v1/entries?id=eq.' + e.id + '&select=id', 'GET');
       const exists = check.ok && (await check.json()).length > 0;
-      await fetch(SUPABASE_URL + '/rest/v1/entries' + (exists ? '?id=eq.' + e.id : ''), {
-        method: exists ? 'PATCH' : 'POST',
-        headers: { ...sbHeaders(), 'Prefer': 'return=minimal' },
-        body: JSON.stringify({
-          id: e.id, user_id: authUser.id,
-          text: e.text, prompt: e.prompt || null,
-          date: e.date, edited_at: e.editedAt || null,
-          thread: e.thread || [],
-        }),
-      });
+      await sbProxy(
+        '/rest/v1/entries' + (exists ? '?id=eq.' + e.id : ''),
+        exists ? 'PATCH' : 'POST',
+        { id: e.id, user_id: authUser.id, text: e.text, prompt: e.prompt || null, date: e.date, edited_at: e.editedAt || null, thread: e.thread || [] }
+      );
     } else if (action === 'delete') {
-      await fetch(SUPABASE_URL + '/rest/v1/entries?id=eq.' + arg, {
-        method: 'DELETE', headers: { ...sbHeaders(), 'Prefer': 'return=minimal' },
-      });
+      await sbProxy('/rest/v1/entries?id=eq.' + arg, 'DELETE');
     }
   } catch(e) { console.log('Sync error:', e); }
 }
@@ -678,15 +671,10 @@ async function cloudSync(action, arg) {
 async function loadFromCloud() {
   if (!authToken || !authUser) return false;
   try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/entries?select=id,text,prompt,date,edited_at,thread&order=date.desc', { headers: sbHeaders() });
+    const r = await sbProxy('/rest/v1/entries?select=id,text,prompt,date,edited_at,thread&order=date.desc', 'GET');
     if (r.ok) {
       const data = await r.json();
-      const entries = data.map(e => ({
-        id: e.id, text: e.text, prompt: e.prompt,
-        date: e.date, editedAt: e.edited_at,
-        thread: e.thread || [],
-      }));
-      saveEntries(entries);
+      saveEntries(data.map(e => ({ id: e.id, text: e.text, prompt: e.prompt, date: e.date, editedAt: e.edited_at, thread: e.thread || [] })));
       return true;
     }
   } catch(e) {}
@@ -694,7 +682,7 @@ async function loadFromCloud() {
 }
 
 async function migrateLocalToCloud() {
-  if (!authToken || !authUser) return;
+  if (!authToken || !authUser) { localStorage.setItem('sizai_migrated', '1'); return; }
   if (localStorage.getItem('sizai_migrated')) return;
   const local = getEntries();
   if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
@@ -740,18 +728,10 @@ async function doAuth() {
 
   try {
     // 尝试登录
-    let r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+    let r = await sbProxy('/auth/v1/token?grant_type=password', 'POST', { email, password });
     if (!r.ok) {
       // 登录失败 → 尝试注册
-      r = await fetch(SUPABASE_URL + '/auth/v1/signup', {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      r = await sbProxy('/auth/v1/signup', 'POST', { email, password });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         const msg = err.msg || err.message || ('HTTP ' + r.status);
@@ -769,11 +749,7 @@ async function doAuth() {
         toast(isZh?'该邮箱已注册，请直接登录':'Email already registered. Please log in.');
         return;
       }
-      r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      r = await sbProxy('/auth/v1/token?grant_type=password', 'POST', { email, password });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         toast(err.msg || err.message || (isZh?'注册后登录失败':'Login after signup failed'));

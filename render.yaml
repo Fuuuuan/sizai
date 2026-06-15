@@ -9,3 +9,7 @@ services:
         sync: false
       - key: ACCESS_CODE
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false

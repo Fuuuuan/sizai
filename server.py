@@ -7,6 +7,7 @@
 import json
 import os
 import urllib.request
+import urllib.error
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -17,6 +18,8 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 INBOX_FILE = os.path.join(os.path.dirname(__file__), "inbox.md")
 REPLIES_FILE = os.path.join(os.path.dirname(__file__), "replies.json")
@@ -113,8 +116,51 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/submit":
             self.handle_submit()
+        elif self.path == "/api/supabase":
+            self.handle_sb_proxy()
         else:
             self.send_json({"error": "not_found"}, 404)
+
+    def handle_sb_proxy(self):
+        """代理 Supabase API 请求（绕过 GFW）。"""
+        if not SUPABASE_URL:
+            self.send_json({"error": "supabase_not_configured"}, 500)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            self.send_json({"error": "invalid_json"}, 400)
+            return
+
+        sb_path = body.get("path", "")
+        sb_method = body.get("method", "GET")
+        sb_body = body.get("body", None)
+        sb_token = body.get("token", "")
+
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Content-Type": "application/json",
+        }
+        if sb_token:
+            headers["Authorization"] = f"Bearer {sb_token}"
+
+        url = f"{SUPABASE_URL}{sb_path}"
+        data = json.dumps(sb_body).encode("utf-8") if sb_body else None
+
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers, method=sb_method)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            self.send_json(result, resp.status if hasattr(resp, 'status') else 200)
+        except urllib.error.HTTPError as e:
+            try:
+                err = json.loads(e.read().decode("utf-8"))
+            except Exception:
+                err = {"error": str(e)}
+            self.send_json(err, e.code)
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
 
     def handle_question(self):
         if not self._check_auth():
