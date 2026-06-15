@@ -586,7 +586,7 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '15';
+const APP_VERSION = '16';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
@@ -1381,6 +1381,11 @@ function pickRandomQuestion() {
 
 function displayQuestion(data) {
   if (!data) data = getDailyQuestion();
+  // 确保英文字段存在（从题库补齐）
+  if (!data.en && data.index !== undefined && QUESTION_BANK[data.index]) {
+    data.en = QUESTION_BANK[data.index].en;
+    data.enSrc = QUESTION_BANK[data.index].enSrc;
+  }
   currentQuestion = data;
   const isZh = L === 'zh';
   document.getElementById('questionText').textContent = isZh ? data.q : (data.en || data.q);
@@ -1390,9 +1395,11 @@ function displayQuestion(data) {
   } else {
     document.getElementById('questionLabel').textContent = isZh ? '今日之问' : 'Today\'s Question';
   }
-  document.getElementById('btnRefresh').textContent = isZh ? '↻ 换一个问题' : '↻ New Question';
-  document.getElementById('btnAI').textContent = isZh ? '✦ AI 生成' : '✦ AI Generate';
-  document.getElementById('btnAI').nextElementSibling.textContent = isZh ? '✎ 回应这个问题' : '✎ Respond';
+  const br = document.getElementById('btnRefresh');
+  if (br) br.textContent = isZh ? '↻ 换一个问题' : '↻ New Question';
+  const ba = document.getElementById('btnAI');
+  if (ba) ba.textContent = isZh ? '✦ AI 生成' : '✦ AI Generate';
+  if (ba && ba.nextElementSibling) ba.nextElementSibling.textContent = isZh ? '✎ 回应这个问题' : '✎ Respond';
 }
 
 async function refreshQuestion() {
