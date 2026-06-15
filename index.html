@@ -108,17 +108,27 @@
   .auth-btn {
     position: absolute; top: 16px; left: 20px;
     z-index: 10;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: rgba(200,200,220,0.4);
-    padding: 4px 10px;
+    background: rgba(212,168,84,0.06);
+    border: 1px solid rgba(212,168,84,0.2);
+    color: var(--accent);
+    padding: 4px 12px;
     border-radius: 12px;
     font-size: 0.7rem; cursor: pointer;
     letter-spacing: 0.04em;
-    transition: all 0.2s;
+    transition: all 0.3s;
+    animation: authPulse 3s ease-in-out infinite;
   }
-  .auth-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .auth-btn.logged-in { color: rgba(140,200,160,0.6); border-color: rgba(140,200,160,0.2); }
+  @keyframes authPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(212,168,84,0); }
+    50% { box-shadow: 0 0 8px rgba(212,168,84,0.15); }
+  }
+  .auth-btn:hover { border-color: var(--accent); animation: none; }
+  .auth-btn.logged-in {
+    background: rgba(140,200,160,0.06);
+    border-color: rgba(140,200,160,0.2);
+    color: rgba(140,200,160,0.7);
+    animation: none;
+  }
   .sync-btn {
     position: absolute; top: 16px; left: 20px;
     z-index: 10;
@@ -486,7 +496,6 @@
 <meta name="apple-mobile-web-app-title" content="思在">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><rect width='180' height='180' rx='36' fill='%230a0a0f'/><text x='90' y='115' text-anchor='middle' font-size='100' font-family='serif'>🌿</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -577,83 +586,59 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '8';
+const APP_VERSION = '9';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
 }
 
 // ═══════════════════════════════════════
-//  SUPABASE — 云端数据库 + 用户认证
+//  SUPABASE — 云端数据库 + 用户认证（纯 REST API，零外部依赖）
 // ═══════════════════════════════════════
-// 部署前替换为你的 Supabase 项目 URL 和 anon key
 const SUPABASE_URL = 'https://yvphvjhxjwdizwloqengv.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2cHZoanhqd2Rpd3psb3Flbmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0ODQyNTUsImV4cCI6MjA5NzA2MDI1NX0.jUSRwz_DWJbM4Z1xs46eGiRpZ0arau0hTtC-PmNAL-g';
-let supabase = null;
 let authUser = null;
+let authToken = localStorage.getItem('sizai_auth_token') || null;
 
-try {
-  if (SUPABASE_URL.includes('YOUR_PROJECT')) {
-    console.log('⚠ Supabase 未配置，使用本地存储');
-  } else if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  }
-} catch(e) {}
+function sbHeaders() {
+  const h = { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' };
+  if (authToken) h['Authorization'] = 'Bearer ' + authToken;
+  return h;
+}
 
 async function checkAuth() {
-  if (!supabase) return;
+  if (!authToken) { updateAuthUI(false); return; }
   try {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      authUser = data.session.user;
-      document.getElementById('authBtn').textContent = authUser.email.split('@')[0];
-      document.getElementById('authBtn').className = 'auth-btn logged-in';
+    const r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: sbHeaders() });
+    if (r.ok) {
+      const u = await r.json();
+      authUser = u;
+      updateAuthUI(true);
       await migrateLocalToCloud();
       const changed = await loadFromCloud();
       if (changed) { renderGarden(); initStars(); refreshUI(); }
     } else {
-      authUser = null;
-      document.getElementById('authBtn').textContent = L==='zh'?'登录':'Login';
-      document.getElementById('authBtn').className = 'auth-btn';
+      // Token expired
+      authToken = null; authUser = null;
+      localStorage.removeItem('sizai_auth_token');
+      updateAuthUI(false);
     }
-  } catch(e) {}
+  } catch(e) { updateAuthUI(false); }
 }
 
-async function migrateLocalToCloud() {
-  if (!supabase || !authUser) return;
-  const migrated = localStorage.getItem('sizai_migrated');
-  if (migrated) return;
-  const local = getEntriesLocal();
-  if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
-  // 上传本地数据到云端
-  for (const e of local) {
-    await supabase.from('entries').upsert({
-      id: e.id, user_id: authUser.id,
-      text: e.text, prompt: e.prompt || null,
-      date: e.date, edited_at: e.editedAt || null,
-      thread: e.thread || [],
-    });
-  }
-  localStorage.setItem('sizai_migrated', '1');
-}
-
-async function loadFromCloud() {
-  if (!supabase || !authUser) return;
-  const { data } = await supabase.from('entries').select('*').order('date', { ascending: false });
-  if (data) {
-    const entries = data.map(e => ({
-      id: e.id, text: e.text, prompt: e.prompt,
-      date: e.date, editedAt: e.edited_at,
-      thread: e.thread || [],
-    }));
-    localStorage.setItem('sizai_entries', JSON.stringify(entries));
-    renderGarden();
-    initStars();
+function updateAuthUI(loggedIn) {
+  const btn = document.getElementById('authBtn');
+  if (!btn) return;
+  if (loggedIn && authUser) {
+    btn.textContent = (authUser.email || '').split('@')[0] || '...';
+    btn.className = 'auth-btn logged-in';
+  } else {
+    btn.textContent = L==='zh'?'登录':'Login';
+    btn.className = 'auth-btn';
   }
 }
 
-// ── 数据层：Supabase（登录时）或 localStorage（未登录）──
-// 用本地缓存同步，getEntries() 保持同步，不破坏已有代码
+// ── 数据层：Supabase REST API（登录时）或 localStorage（未登录）──
 
 function getEntries() {
   try { return JSON.parse(localStorage.getItem('sizai_entries')) || []; }
@@ -664,28 +649,38 @@ function saveEntries(entries) {
   localStorage.setItem('sizai_entries', JSON.stringify(entries));
 }
 
-async function cloudSync(action, entry) {
-  // 云端操作 + 同步本地缓存
-  if (!supabase || !authUser) return;
+async function cloudSync(action, arg) {
+  if (!authToken || !authUser) return;
   try {
     if (action === 'upsert') {
-      await supabase.from('entries').upsert({
-        id: entry.id, user_id: authUser.id,
-        text: entry.text, prompt: entry.prompt || null,
-        date: entry.date, edited_at: entry.editedAt || null,
-        thread: entry.thread || [],
+      const e = arg;
+      // 先查是否存在
+      const check = await fetch(SUPABASE_URL + '/rest/v1/entries?id=eq.' + e.id + '&select=id', { headers: sbHeaders() });
+      const exists = check.ok && (await check.json()).length > 0;
+      await fetch(SUPABASE_URL + '/rest/v1/entries' + (exists ? '?id=eq.' + e.id : ''), {
+        method: exists ? 'PATCH' : 'POST',
+        headers: { ...sbHeaders(), 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          id: e.id, user_id: authUser.id,
+          text: e.text, prompt: e.prompt || null,
+          date: e.date, edited_at: e.editedAt || null,
+          thread: e.thread || [],
+        }),
       });
     } else if (action === 'delete') {
-      await supabase.from('entries').delete().eq('id', entry).eq('user_id', authUser.id);
+      await fetch(SUPABASE_URL + '/rest/v1/entries?id=eq.' + arg, {
+        method: 'DELETE', headers: { ...sbHeaders(), 'Prefer': 'return=minimal' },
+      });
     }
-  } catch(e) { console.log('Cloud sync error:', e); }
+  } catch(e) { console.log('Sync error:', e); }
 }
 
 async function loadFromCloud() {
-  if (!supabase || !authUser) return false;
+  if (!authToken || !authUser) return false;
   try {
-    const { data } = await supabase.from('entries').select('id,text,prompt,date,edited_at,thread').order('date', { ascending: false });
-    if (data) {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/entries?select=id,text,prompt,date,edited_at,thread&order=date.desc', { headers: sbHeaders() });
+    if (r.ok) {
+      const data = await r.json();
       const entries = data.map(e => ({
         id: e.id, text: e.text, prompt: e.prompt,
         date: e.date, editedAt: e.edited_at,
@@ -699,9 +694,8 @@ async function loadFromCloud() {
 }
 
 async function migrateLocalToCloud() {
-  if (!supabase || !authUser) return;
-  const migrated = localStorage.getItem('sizai_migrated');
-  if (migrated) return;
+  if (!authToken || !authUser) return;
+  if (localStorage.getItem('sizai_migrated')) return;
   const local = getEntries();
   if (local.length === 0) { localStorage.setItem('sizai_migrated', '1'); return; }
   for (const e of local) {
@@ -711,18 +705,17 @@ async function migrateLocalToCloud() {
 }
 
 function openAuth() {
-  if (!supabase) { toast('Supabase not configured'); return; }
+  const isZh = L === 'zh';
   if (authUser) {
     // 已登录 → 退出
-    supabase.auth.signOut().then(() => {
-      authUser = null;
-      document.getElementById('authBtn').textContent = L==='zh'?'登录':'Login';
-      document.getElementById('authBtn').className = 'auth-btn';
-      toast(L==='zh'?'已退出':'Signed out');
-    });
+    authToken = null; authUser = null;
+    localStorage.removeItem('sizai_auth_token');
+    saveEntries([]);  // 清空本地缓存
+    updateAuthUI(false);
+    renderGarden(); initStars();
+    toast(isZh?'已退出':'Signed out');
     return;
   }
-  const isZh = L === 'zh';
   document.getElementById('modalContent').innerHTML =
     '<div style="font-size:1rem; color:var(--text-bright); margin-bottom:12px;">' + (isZh?'登录 / 注册':'Login / Sign Up') + '</div>'
     + '<p style="font-size:0.78rem; color:rgba(200,200,220,0.5); margin-bottom:14px;">' + (isZh?'输入邮箱和密码。新用户自动注册。':'Enter email and password. New users are auto-registered.') + '</p>'
@@ -741,23 +734,40 @@ async function doAuth() {
   if (!email || !password) { toast(L==='zh'?'请填写邮箱和密码':'Fill in both fields'); return; }
   if (password.length < 6) { toast(L==='zh'?'密码至少6位':'Password must be 6+ chars'); return; }
 
-  // 先尝试登录
-  let { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
+  const isZh = L === 'zh';
+  // 尝试登录
+  let r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!r.ok) {
     // 登录失败 → 尝试注册
-    const { error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError) {
-      toast(signUpError.message);
+    r = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      toast(err.msg || err.message || (isZh?'注册失败':'Signup failed'));
       return;
     }
-    // 注册成功 → 自动登录
-    const { data: d2 } = await supabase.auth.signInWithPassword({ email, password });
-    data = d2;
+    // 注册成功 → 再登录
+    r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
   }
-  if (data && data.session) {
+  const data = await r.json();
+  if (data.access_token) {
+    authToken = data.access_token;
+    authUser = data.user;
+    localStorage.setItem('sizai_auth_token', authToken);
     closeModal();
     await checkAuth();
-    toast(L==='zh'?'已登录 ✓':'Logged in ✓');
+    toast(isZh?'已登录 ✓':'Logged in ✓');
   }
 }
 
@@ -1532,10 +1542,6 @@ function saveEntry() {
 // ═══════════════════════════════════════
 //  ENTRIES / GARDEN
 // ═══════════════════════════════════════
-function getEntries() {
-  try { return JSON.parse(localStorage.getItem('sizai_entries')) || []; }
-  catch(e) { return []; }
-}
 
 function filterGarden() {
   const q = document.getElementById('searchInput').value;
@@ -2248,8 +2254,6 @@ if (navigator.storage && navigator.storage.persist) {
   });
 }
 
-// ── 启动时检查登录状态 ──
-checkAuth();
 </script>
 </body>
 </html>
