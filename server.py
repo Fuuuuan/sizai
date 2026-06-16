@@ -11,7 +11,7 @@ import hashlib
 import secrets
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -172,7 +172,7 @@ class Handler(SimpleHTTPRequestHandler):
         user_id = cur.lastrowid
 
         token = secrets.token_hex(32)
-        expires = datetime.now().replace(hour=23, minute=59, second=59).isoformat()  # 当天有效
+        expires = (datetime.now() + timedelta(days=30)).isoformat()
         cur.execute("INSERT INTO sessions (user_id, token, expires) VALUES (?,?,?)", (user_id, token, expires))
         db.commit()
         self.send_json({"ok": True, "user_id": user_id, "token": token, "email": email})
@@ -202,7 +202,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         token = secrets.token_hex(32)
-        expires = datetime.now().replace(hour=23, minute=59, second=59).isoformat()  # 当天有效
+        expires = (datetime.now() + timedelta(days=30)).isoformat()
         cur.execute("INSERT INTO sessions (user_id, token, expires) VALUES (?,?,?)", (user_id, token, expires))
         db.commit()
         self.send_json({"ok": True, "user_id": user_id, "token": token, "email": email})
