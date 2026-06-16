@@ -1335,9 +1335,9 @@ function shareCard(entryId) {
     answer = document.getElementById('writeArea')?.value?.trim() || '';
   }
 
-  if (!answer) {
-    toast(isZh?'先去书写区写点什么再分享':'Write something first before sharing');
-    return;
+  if (!answer && !entryId) {
+    // 纯问题分享（没有回答）
+    answer = '';
   }
 
   // 精炼回答（截取前 300 字或让用户可编辑）
@@ -1407,19 +1407,21 @@ function generateCardImage(question, source, answer) {
     var answerY = 200;
   }
 
-  // 分割线
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.beginPath(); ctx.moveTo(w/2-80, answerY-10); ctx.lineTo(w/2+80, answerY-10); ctx.stroke();
+  if (answer) {
+    // 分割线
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(w/2-80, answerY-10); ctx.lineTo(w/2+80, answerY-10); ctx.stroke();
 
-  // 回答
-  ctx.fillStyle = '#d0d0dc';
-  ctx.font = '28px "Noto Serif SC", serif';
-  const aLines = wrapText(ctx, answer, w - 140);
-  let aY = answerY + 40;
-  aLines.forEach(line => {
-    ctx.fillText(line, w/2, aY);
-    aY += 48;
-  });
+    // 回答
+    ctx.fillStyle = '#d0d0dc';
+    ctx.font = '28px "Noto Serif SC", serif';
+    const aLines = wrapText(ctx, answer, w - 140);
+    let aY = answerY + 40;
+    aLines.forEach(line => {
+      ctx.fillText(line, w/2, aY);
+      aY += 48;
+    });
+  }
 
   // 底部品牌
   const footerY = h - 120;
