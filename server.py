@@ -296,10 +296,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": "empty"}, 400)
             return
 
-        sys = "你是编辑。用户写了一段哲学思辨文字。你的任务是用精炼、优美的语言重新表达「用户本人的核心观点」，不是你自己去发挥或回应。\n\n规则：\n1. ≤200字\n2. 只写用户的观点——ta想了什么、ta的论证是什么、ta得出了什么\n3. 用打磨过的文笔，但不改变用户的意思\n4. 不要把你自己（AI）的想法混进去\n5. 只输出文本"
+        sys = "读下面的文字。这是用户写的。用你自己的文笔把它写得更精炼、更漂亮，但——\n\n重要：你写出来的必须是「用户说了什么」。主语永远是用户。不要评价、不要补充、不要引申。你不是在对话，你是在帮ta把ta已经说过的话写得更干净。\n\n≤200字。"
         user = text
         if prompt:
-            user = f"用户最初回应的问题：「{prompt}」\n\n用户的文字：\n{text}"
+            user = f"关于问题「{prompt}」，用户写道：\n{text}\n\n把上面这段文字精炼一下。"
 
         try:
             summary = _deepseek([
