@@ -1328,7 +1328,15 @@ async function shareEntry(id) {
   if (!e) return;
 
   const question = e.prompt || '';
-  const answer = e.text;
+  // 构建完整对话文本（如果有线程）
+  let fullText = '';
+  if (e.thread && e.thread.length > 0) {
+    fullText = e.thread.map(m =>
+      (m.role === 'user' ? (L==='zh'?'我：':'Me: ') : 'Claude：') + m.text
+    ).join('\n\n');
+  } else {
+    fullText = e.text;
+  }
 
   // 弹窗显示加载中
   document.getElementById('modalContent').innerHTML =
@@ -1338,13 +1346,13 @@ async function shareEntry(id) {
     + '</div>';
   document.getElementById('modalOverlay').style.display = 'flex';
 
-  // 调用 AI 精炼
-  let summary = answer.length > 200 ? answer.slice(0, 200) + '…' : answer;
+  // 调用 AI 精炼（回退：截取全文前200字）
+  let summary = fullText.length > 200 ? fullText.slice(0, 200) + '…' : fullText;
   try {
     const r = await fetch(API_BASE + '/api/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ text: answer, prompt: question }),
+      body: JSON.stringify({ text: fullText, prompt: question }),
       signal: AbortSignal.timeout(30000),
     });
     if (r.ok) {
