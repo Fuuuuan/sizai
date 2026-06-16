@@ -531,6 +531,7 @@
           ✦ AI 生成
         </button>
         <button class="btn primary" onclick="goWriteWithQuestion()">✎ 回应这个问题</button>
+        <button class="btn" onclick="shareCard()" style="border-color:rgba(160,180,220,0.2);">📤 分享</button>
       </div>
     </div>
   </section>
@@ -586,7 +587,7 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '16';
+const APP_VERSION = '17';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
@@ -1310,6 +1311,95 @@ const QUESTION_BANK = [
   { q: "如果你换了一种语言生活——你的性格会改变吗？你的价值观呢？", en: "If you lived your life in a different language — would your personality change? What about your values?", src: "—— 语言相对论与自我", enSrc: "— Linguistic relativity & the self" },
   { q: "什么时候你觉得自己「不是一个东西」？不是物体，不是标签，不是任何可以定义的存在？", en: "When do you feel you are 'not a thing'? Not an object, not a label, not any definable entity?", src: "—— 超越定义的存在体验", enSrc: "— The experience of being beyond definition" },
 ];
+
+// ═══════════════════════════════════════
+//  SHARE CARD — 生成分享图片
+// ═══════════════════════════════════════
+function shareCard() {
+  if (!currentQuestion) currentQuestion = getDailyQuestion();
+  const isZh = L === 'zh';
+  const q = isZh ? currentQuestion.q : (currentQuestion.en || currentQuestion.q);
+  const src = isZh ? currentQuestion.src : (currentQuestion.enSrc || currentQuestion.src);
+
+  // 创建画布 1080x1080 (Instagram 方形)
+  const size = 1080;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+
+  // 背景
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, size, size);
+
+  // 星空点缀
+  for (let i = 0; i < 80; i++) {
+    const x = Math.random() * size, y = Math.random() * size * 0.7;
+    ctx.fillStyle = `rgba(200,210,240,${Math.random() * 0.3 + 0.05})`;
+    ctx.beginPath(); ctx.arc(x, y, Math.random() * 1.5 + 0.3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 品牌
+  ctx.fillStyle = 'rgba(212,168,84,0.6)';
+  ctx.font = '28px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('思·在  THINKING · BEING', size/2, 100);
+
+  // 装饰线
+  ctx.strokeStyle = 'rgba(212,168,84,0.15)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(size/2 - 120, 130); ctx.lineTo(size/2 + 120, 130); ctx.stroke();
+
+  // 问题文本（自动换行）
+  ctx.fillStyle = '#e8e8f0';
+  ctx.font = 'bold 44px "Noto Serif SC", "Songti SC", serif';
+  ctx.textAlign = 'center';
+  const maxW = size - 200;
+  const lines = wrapText(ctx, q, maxW);
+  const lineH = 64;
+  const startY = size/2 - (lines.length * lineH) / 2 + 20;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, size/2, startY + i * lineH);
+  });
+
+  // 来源
+  if (src) {
+    ctx.fillStyle = 'rgba(200,200,220,0.35)';
+    ctx.font = '22px serif';
+    ctx.fillText(src, size/2, size - 180);
+  }
+
+  // 底部品牌
+  ctx.fillStyle = 'rgba(200,200,220,0.2)';
+  ctx.font = '18px sans-serif';
+  ctx.fillText('fuuuuan.github.io/sizai', size/2, size - 80);
+
+  // 导出
+  c.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sizai-share.png';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(isZh?'已下载分享图':'Share card downloaded');
+  }, 'image/png');
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const lines = [];
+  let current = '';
+  for (const char of text) {
+    const test = current + char;
+    if (ctx.measureText(test).width > maxWidth && current.length > 0) {
+      lines.push(current);
+      current = char;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
 
 // ═══════════════════════════════════════
 //  QUESTION ENGINE
