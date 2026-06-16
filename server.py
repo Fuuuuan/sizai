@@ -134,6 +134,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/submit":
             self.handle_submit()
+        elif self.path == "/api/summarize":
+            self.handle_summarize()
         elif self.path == "/api/auth/signup":
             self.handle_signup()
         elif self.path == "/api/auth/login":
@@ -274,6 +276,37 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             question = generate_question()
             self.send_json(question)
+        except Exception as e:
+            self.send_json({"error": str(e)})
+
+    def handle_summarize(self):
+        """AI 精炼用户回答，用于分享卡片（≤120字）。"""
+        if not self._check_auth() and ACCESS_CODE:
+            self.send_json({"error": "unauthorized"}, 401)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            self.send_json({"error": "invalid_json"}, 400)
+            return
+        text = body.get("text", "").strip()
+        prompt = body.get("prompt", "")
+        if not text:
+            self.send_json({"error": "empty"}, 400)
+            return
+
+        sys = "你是一位编辑。把下面这段哲学思辨文字精炼成 ≤120 字的核心观点。保留原文的力度和逻辑，删去修饰和冗余。如果原文回应了某个问题，精炼版需要体现出与那个问题的关联。只输出精炼后的文本，不加引号、不解释、不评价。"
+        user = text
+        if prompt:
+            user = f"用户在回应这个问题：「{prompt}」\n\n用户原文：\n{text}"
+
+        try:
+            summary = _deepseek([
+                {"role": "system", "content": sys},
+                {"role": "user", "content": user},
+            ], max_tokens=200)
+            self.send_json({"ok": True, "summary": summary.strip()})
         except Exception as e:
             self.send_json({"error": str(e)})
 

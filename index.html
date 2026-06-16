@@ -403,11 +403,18 @@
     font-size: 0.7rem;
     color: rgba(200,200,220,0.3);
   }
+  .garden-card .gc-share {
+    font-size: 0.7rem;
+    color: rgba(180,200,220,0.35);
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .garden-card .gc-share:hover { color: var(--accent); }
   .garden-card .gc-delete {
     font-size: 0.7rem;
     color: rgba(200,200,220,0.2);
     cursor: pointer;
-    margin-left: auto;
     text-decoration: none;
     transition: color 0.2s;
   }
@@ -531,7 +538,6 @@
           ✦ AI 生成
         </button>
         <button class="btn primary" onclick="goWriteWithQuestion()">✎ 回应这个问题</button>
-        <button class="btn" onclick="shareCard()" style="border-color:rgba(160,180,220,0.2);">📤 分享</button>
       </div>
     </div>
   </section>
@@ -587,7 +593,7 @@
 // ═══════════════════════════════════════
 //  AUTO UPDATE — 检测新版本，自动刷新
 // ═══════════════════════════════════════
-const APP_VERSION = '17';
+const APP_VERSION = '18';
 if (localStorage.getItem('sizai_version') !== APP_VERSION) {
   localStorage.setItem('sizai_version', APP_VERSION);
   location.reload(true);
@@ -1315,36 +1321,40 @@ const QUESTION_BANK = [
 // ═══════════════════════════════════════
 //  SHARE CARD — 弹窗预览 + 分享图片
 // ═══════════════════════════════════════
-function shareCard(entryId) {
+async function shareEntry(id) {
   const isZh = L === 'zh';
-  let question, source, answer;
+  const entries = getEntries();
+  const e = entries.find(en => en.id === id);
+  if (!e) return;
 
-  if (entryId) {
-    // 从星辰条目分享
-    const entries = getEntries();
-    const e = entries.find(en => en.id === entryId);
-    if (!e) return;
-    question = e.prompt || '';
-    answer = e.text;
-    source = '';
-  } else {
-    // 从当前问题分享（需要从书写区取文字）
-    if (!currentQuestion) currentQuestion = getDailyQuestion();
-    question = isZh ? currentQuestion.q : (currentQuestion.en || currentQuestion.q);
-    source = isZh ? currentQuestion.src : (currentQuestion.enSrc || currentQuestion.src);
-    answer = document.getElementById('writeArea')?.value?.trim() || '';
-  }
+  const question = e.prompt || '';
+  const answer = e.text;
 
-  if (!answer && !entryId) {
-    // 纯问题分享（没有回答）
-    answer = '';
-  }
+  // 弹窗显示加载中
+  document.getElementById('modalContent').innerHTML =
+    '<div style="text-align:center; padding:40px;">'
+    + '<div class="spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 16px;"></div>'
+    + '<div style="color:rgba(200,200,220,0.5);">' + (isZh?'AI 正在精炼你的回答…':'AI is refining your answer…') + '</div>'
+    + '</div>';
+  document.getElementById('modalOverlay').style.display = 'flex';
 
-  // 精炼回答（截取前 300 字或让用户可编辑）
-  const summary = answer.length > 300 ? answer.slice(0, 300) + '…' : answer;
+  // 调用 AI 精炼
+  let summary = answer.length > 200 ? answer.slice(0, 200) + '…' : answer;
+  try {
+    const r = await fetch(API_BASE + '/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ text: answer, prompt: question }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.summary) summary = d.summary;
+    }
+  } catch(x) {}
 
-  // 生成预览图，放入弹窗
-  const img = generateCardImage(question, source, summary);
+  // 生成卡片
+  const img = generateCardImage(question, '', summary);
   const imgSrc = img.toDataURL('image/png');
 
   document.getElementById('modalContent').innerHTML =
@@ -1877,7 +1887,8 @@ function renderGarden(filter) {
       + '<div class="gc-meta">'
       + threadInfo
       + editedMark
-      + '<a href="#" class="gc-delete" onclick="event.stopPropagation();deleteEntry(' + e.id + ');return false;">删除</a>'
+      + '<a href="#" class="gc-share" onclick="event.stopPropagation();shareEntry(' + e.id + ');return false;">' + (L==='zh'?'分享':'Share') + '</a>'
+      + '<a href="#" class="gc-delete" onclick="event.stopPropagation();deleteEntry(' + e.id + ');return false;">' + (L==='zh'?'删除':'Del') + '</a>'
       + '</div>'
       + '</div>';
   }).join('');
