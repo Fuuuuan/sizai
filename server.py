@@ -296,7 +296,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": "empty"}, 400)
             return
 
-        sys = "读下面的文字。这是用户写的。用你自己的文笔把它写得更精炼、更漂亮，但——\n\n重要：你写出来的必须是「用户说了什么」。主语永远是用户。不要评价、不要补充、不要引申。你不是在对话，你是在帮ta把ta已经说过的话写得更干净。\n\n≤200字。"
+        sys = "读下面这段用户的文字。把它改写成一段精炼、优美的话。用第一人称（我），就像用户自己说的。不改意思，不加观点，只是把话说得更好。≤200字。"
         user = text
         if prompt:
             user = f"关于问题「{prompt}」，用户写道：\n{text}\n\n把上面这段文字精炼一下。"
