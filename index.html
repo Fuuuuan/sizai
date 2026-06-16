@@ -1313,82 +1313,151 @@ const QUESTION_BANK = [
 ];
 
 // ═══════════════════════════════════════
-//  SHARE CARD — 生成分享图片
+//  SHARE CARD — 弹窗预览 + 分享图片
 // ═══════════════════════════════════════
-function shareCard() {
-  if (!currentQuestion) currentQuestion = getDailyQuestion();
+function shareCard(entryId) {
   const isZh = L === 'zh';
-  const q = isZh ? currentQuestion.q : (currentQuestion.en || currentQuestion.q);
-  const src = isZh ? currentQuestion.src : (currentQuestion.enSrc || currentQuestion.src);
+  let question, source, answer;
 
-  // 创建画布 1080x1080 (Instagram 方形)
-  const size = 1080;
+  if (entryId) {
+    // 从星辰条目分享
+    const entries = getEntries();
+    const e = entries.find(en => en.id === entryId);
+    if (!e) return;
+    question = e.prompt || '';
+    answer = e.text;
+    source = '';
+  } else {
+    // 从当前问题分享（需要从书写区取文字）
+    if (!currentQuestion) currentQuestion = getDailyQuestion();
+    question = isZh ? currentQuestion.q : (currentQuestion.en || currentQuestion.q);
+    source = isZh ? currentQuestion.src : (currentQuestion.enSrc || currentQuestion.src);
+    answer = document.getElementById('writeArea')?.value?.trim() || '';
+  }
+
+  if (!answer) {
+    toast(isZh?'先去书写区写点什么再分享':'Write something first before sharing');
+    return;
+  }
+
+  // 精炼回答（截取前 300 字或让用户可编辑）
+  const summary = answer.length > 300 ? answer.slice(0, 300) + '…' : answer;
+
+  // 生成预览图，放入弹窗
+  const img = generateCardImage(question, source, summary);
+  const imgSrc = img.toDataURL('image/png');
+
+  document.getElementById('modalContent').innerHTML =
+    '<div style="text-align:center;">'
+    + '<div style="font-size:0.85rem; color:var(--accent); margin-bottom:8px;">' + (isZh?'预览分享卡片':'Preview Share Card') + '</div>'
+    + '<img src="' + imgSrc + '" style="width:100%; max-width:375px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
+    + '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; justify-content:center;">'
+    + '<button class="btn primary" onclick="downloadShareCard()">📥 ' + (isZh?'保存图片':'Save Image') + '</button>'
+    + '<button class="btn" onclick="shareImage()">📤 ' + (isZh?'分享':'Share') + '</button>'
+    + '<button class="close-btn" onclick="closeModal()">' + (isZh?'关闭':'Close') + '</button>'
+    + '</div></div>';
+  document.getElementById('modalOverlay').style.display = 'flex';
+
+  // 存到全局供下载用
+  window._shareCardImage = img;
+}
+
+function generateCardImage(question, source, answer) {
+  const w = 750, h = 1334; // 手机竖屏比例
   const c = document.createElement('canvas');
-  c.width = size; c.height = size;
+  c.width = w; c.height = h;
   const ctx = c.getContext('2d');
 
   // 背景
-  ctx.fillStyle = '#0a0a12';
-  ctx.fillRect(0, 0, size, size);
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#0e0e1a');
+  grad.addColorStop(0.5, '#0a0a14');
+  grad.addColorStop(1, '#0c0c18');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
 
-  // 星空点缀
-  for (let i = 0; i < 80; i++) {
-    const x = Math.random() * size, y = Math.random() * size * 0.7;
-    ctx.fillStyle = `rgba(200,210,240,${Math.random() * 0.3 + 0.05})`;
-    ctx.beginPath(); ctx.arc(x, y, Math.random() * 1.5 + 0.3, 0, Math.PI * 2); ctx.fill();
+  // 星星
+  for (let i = 0; i < 50; i++) {
+    ctx.fillStyle = `rgba(200,210,240,${Math.random()*0.2+0.03})`;
+    ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h*0.6, Math.random()*1.2+0.2, 0, Math.PI*2); ctx.fill();
   }
 
-  // 品牌
-  ctx.fillStyle = 'rgba(212,168,84,0.6)';
-  ctx.font = '28px serif';
+  // 品牌顶部
+  ctx.fillStyle = 'rgba(212,168,84,0.5)';
+  ctx.font = '24px serif';
   ctx.textAlign = 'center';
-  ctx.fillText('思·在  THINKING · BEING', size/2, 100);
+  ctx.fillText('思·在  THINKING · BEING', w/2, 80);
 
-  // 装饰线
-  ctx.strokeStyle = 'rgba(212,168,84,0.15)';
+  ctx.strokeStyle = 'rgba(212,168,84,0.1)';
   ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(size/2 - 120, 130); ctx.lineTo(size/2 + 120, 130); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w/2-100, 105); ctx.lineTo(w/2+100, 105); ctx.stroke();
 
-  // 问题文本（自动换行）
-  ctx.fillStyle = '#e8e8f0';
-  ctx.font = 'bold 44px "Noto Serif SC", "Songti SC", serif';
-  ctx.textAlign = 'center';
-  const maxW = size - 200;
-  const lines = wrapText(ctx, q, maxW);
-  const lineH = 64;
-  const startY = size/2 - (lines.length * lineH) / 2 + 20;
-  lines.forEach((line, i) => {
-    ctx.fillText(line, size/2, startY + i * lineH);
+  // 问题
+  if (question) {
+    ctx.fillStyle = 'rgba(212,168,84,0.8)';
+    ctx.font = '26px "Noto Serif SC", serif';
+    const qLines = wrapText(ctx, '「' + question + '」', w - 160);
+    let qY = 170;
+    qLines.forEach(line => {
+      ctx.fillText(line, w/2, qY);
+      qY += 44;
+    });
+    var answerY = qY + 40;
+  } else {
+    var answerY = 200;
+  }
+
+  // 分割线
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath(); ctx.moveTo(w/2-80, answerY-10); ctx.lineTo(w/2+80, answerY-10); ctx.stroke();
+
+  // 回答
+  ctx.fillStyle = '#d0d0dc';
+  ctx.font = '28px "Noto Serif SC", serif';
+  const aLines = wrapText(ctx, answer, w - 140);
+  let aY = answerY + 40;
+  aLines.forEach(line => {
+    ctx.fillText(line, w/2, aY);
+    aY += 48;
   });
 
-  // 来源
-  if (src) {
-    ctx.fillStyle = 'rgba(200,200,220,0.35)';
-    ctx.font = '22px serif';
-    ctx.fillText(src, size/2, size - 180);
-  }
-
   // 底部品牌
-  ctx.fillStyle = 'rgba(200,200,220,0.2)';
-  ctx.font = '18px sans-serif';
-  ctx.fillText('fuuuuan.github.io/sizai', size/2, size - 80);
-
-  // 导出
-  if (c.toBlob) {
-    c.toBlob(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'sizai-share.png'; a.click();
-      URL.revokeObjectURL(url);
-      toast(isZh?'已下载分享图':'Share card downloaded');
-    }, 'image/png');
-  } else {
-    // Safari fallback
-    const url = c.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url; a.download = 'sizai-share.png'; a.click();
-    toast(isZh?'已下载分享图':'Share card downloaded');
+  const footerY = h - 120;
+  ctx.fillStyle = 'rgba(200,200,220,0.12)';
+  ctx.font = '20px sans-serif';
+  ctx.fillText('思·在 · 哲学思辨花园', w/2, footerY);
+  ctx.fillStyle = 'rgba(200,200,220,0.08)';
+  ctx.font = '16px sans-serif';
+  ctx.fillText('fuuuuan.github.io/sizai', w/2, footerY + 30);
+  if (source) {
+    ctx.fillStyle = 'rgba(200,200,220,0.2)';
+    ctx.font = '18px serif';
+    ctx.fillText(source, w/2, footerY - 40);
   }
+
+  return c;
+}
+
+function downloadShareCard() {
+  if (!window._shareCardImage) return;
+  const url = window._shareCardImage.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url; a.download = 'sizai-card.png'; a.click();
+}
+
+async function shareImage() {
+  if (!window._shareCardImage) return;
+  const blob = await new Promise(r => window._shareCardImage.toBlob(r, 'image/png'));
+  if (navigator.share && navigator.canShare && blob) {
+    const file = new File([blob], 'sizai-card.png', { type: 'image/png' });
+    try {
+      await navigator.share({ title: '思·在', text: '', files: [file] });
+      return;
+    } catch(e) {}
+  }
+  // fallback: 下载
+  downloadShareCard();
+  toast(L==='zh'?'已下载（此浏览器不支持直接分享）':'Downloaded (share not supported)');
 }
 
 function wrapText(ctx, text, maxWidth) {
