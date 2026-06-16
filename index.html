@@ -1374,15 +1374,21 @@ function shareCard() {
   ctx.fillText('fuuuuan.github.io/sizai', size/2, size - 80);
 
   // 导出
-  c.toBlob(blob => {
-    const url = URL.createObjectURL(blob);
+  if (c.toBlob) {
+    c.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'sizai-share.png'; a.click();
+      URL.revokeObjectURL(url);
+      toast(isZh?'已下载分享图':'Share card downloaded');
+    }, 'image/png');
+  } else {
+    // Safari fallback
+    const url = c.toDataURL('image/png');
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sizai-share.png';
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = 'sizai-share.png'; a.click();
     toast(isZh?'已下载分享图':'Share card downloaded');
-  }, 'image/png');
+  }
 }
 
 function wrapText(ctx, text, maxWidth) {
